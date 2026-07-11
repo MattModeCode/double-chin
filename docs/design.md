@@ -1,6 +1,6 @@
 # Myna — technical design
 
-Local voice cloning: hand Myna a script and a few seconds of a person's voice, get the script read aloud in that voice. Everything runs on-device; nothing leaves the machine.
+Local voice cloning: hand Myna a script and a few seconds of a person's voice, get the script read aloud in that voice. Inference runs on-device; your audio and enrolled voices never leave the machine. (The engine's weights download once from Hugging Face, and the hub is re-contacted on cold loads unless `HF_HUB_OFFLINE=1` — that is the entire network surface; there is no telemetry.)
 
 This document records the approach tournament, the winning architecture, and the evidence behind every load-bearing claim. Decisions are cross-referenced to [build-log.md](build-log.md) (D-numbers). Claims are cited to live URLs or to test results reproducible in this repo.
 
@@ -51,7 +51,7 @@ Consequences that shape the whole product:
 The mission demands proof, not vibes. The argument has four legs:
 
 1. **Mechanism.** Zero-shot conditioning never trains on the target speaker, so there is no "will it learn my voice" risk class. The only variable is reference-clip quality, which the recording kit controls and `myna enroll` validates (duration floor, format normalization).
-2. **Measured evidence on a stand-in speaker.** A 16.7 s reference of CMU Arctic speaker `bdl` was cloned reading a novel sentence; an independent speaker-verification model (resemblyzer GE2E, [Apache 2.0](https://github.com/resemble-ai/Resemblyzer)) scored clone-vs-reference cosine similarity at **0.902** — above the ≥0.75 community same-speaker threshold ([evaluation](https://ceur-ws.org/Vol-4164/paper7.pdf)) and above the 0.80 "strong match" band. Full numbers in §7; regenerate any time with the e2e test.
+2. **Measured evidence on a stand-in speaker.** A 16.7 s reference of CMU Arctic speaker `bdl` was cloned reading a novel sentence; a separate speaker-verification model (resemblyzer GE2E, [Apache 2.0](https://github.com/resemble-ai/Resemblyzer) — different weights but the same vendor and embedding family as the engine's conditioning, so "separate", not "independent") scored clone-vs-reference cosine similarity at **0.902** for the single sentence and **0.954** for the full 39 s demo script — above the ≥0.75 community same-speaker threshold ([evaluation](https://ceur-ws.org/Vol-4164/paper7.pdf)). Negative controls bound the claim: a *different* real speaker scores 0.672–0.713 on the same metric, so the wrong-speaker floor for same-register English narration is ~0.7, and scores must be read against that floor, not against zero. Full numbers in §7; regenerate any time with the e2e test.
 3. **Falsifiability per run.** `myna say --verify` scores every output against the enrolled reference and prints a verdict. If a clone ever drifts, the user sees a number, not a shrug.
 4. **Honest limits.** Zero-shot cloning reproduces timbre and prosodic register; it does not reproduce idiosyncratic disfluencies, code-switching habits, or emotional range outside the reference's register. Exaggeration/CFG knobs partially compensate (§6). These limits are restated in the red-team report ([red-team.md](red-team.md)).
 
@@ -92,7 +92,7 @@ Design rules: heavy imports are lazy so `myna --help` and unit tests run instant
 
 - **Chunking at 280 chars.** Chatterbox degrades on very long single generations (autoregressive drift; community guidance keeps utterances short). Sentence-aware chunks with 0.35 s intra-paragraph / 0.7 s paragraph pauses read naturally and bound both latency-to-first-audio and failure blast radius.
 - **Knobs surfaced, defaults sane.** `exaggeration` (emotion intensity, default 0.5), `cfg_weight` (reference adherence vs. liveliness, default 0.5), `temperature` (default 0.8) pass straight through to the engine ([API](https://github.com/resemble-ai/chatterbox)); `--seed` gives reproducible takes.
-- **Speed.** MPS on the M5 Pro: model load 7–9 s; measured synthesis RTF ≈ 4.8× realtime cost on first calls (§7) — a 60 s narration costs roughly five minutes. CPU fallback works but is several times slower; `myna doctor` reports which device you'll get. If sustained throughput ever matters more than simplicity, the MLX route (same weights) is the documented upgrade path.
+- **Speed.** MPS on the M5 Pro: model load 7–9 s; measured synthesis speed ≈ 0.21× realtime on first calls (§7) — a 60 s narration costs roughly five minutes of wall time. The CLI prints this same convention ("speed 0.21x realtime"). CPU fallback works but is several times slower; `myna doctor` reports which device you'll get. If sustained throughput ever matters more than simplicity, the MLX route (same weights) is the documented upgrade path.
 - **Determinism.** Same seed + same inputs → same audio; without a seed, takes vary like human takes do. This is a feature for narration work (re-roll a flat line).
 
 ## 7. Measured results (this machine)
@@ -104,10 +104,13 @@ Recorded from runs in this repo on 2026-07-11 (M5 Pro, 48 GB, macOS 25.5, Python
 | `pip install chatterbox-tts` on py3.12/arm64 | clean resolve (with `setuptools<81` pin) |
 | Model load (MPS, warm cache) | 7.2–9.1 s |
 | First-call synthesis, default voice | 4.44 s audio in 21.1 s wall (includes graph warm-up) |
-| Clone synthesis vs 16.7 s stand-in reference (novel sentence) | 6.96 s audio in 33.5 s wall (RTF 4.8, first call) |
-| **Speaker similarity, clone vs reference (resemblyzer GE2E cosine)** | **0.902** — strong match (same-speaker threshold ≥0.75, strong ≥0.80) |
+| Clone synthesis vs 16.7 s stand-in reference (novel sentence) | 6.96 s audio in 33.5 s wall (speed 0.21× realtime, first call) |
+| **Speaker similarity, cloned sentence vs reference (resemblyzer GE2E cosine)** | **0.902** — strong match (same-speaker threshold ≥0.75, strong ≥0.80) |
+| **Speaker similarity, full 39.4 s demo script vs reference** | **0.954** — strong match (4 chunks via `myna say --script`) |
+| Negative control: clone vs a *different* real speaker (VOiCES sp0307) | 0.713 — below the 0.75 match line |
+| Negative control: two different real speakers | 0.672 — below the 0.75 match line |
 
-The end-to-end test (`MYNA_E2E=1 pytest -m slow`) regenerates these numbers on any machine.
+Read the scores against the measured wrong-speaker floor (~0.67–0.71 for same-register English narration), not against zero: the verdict bands' `<0.60` "no match" tier is rarely reachable for clean speech, and `--verify` measures *speaker identity only* — not intelligibility or whether the right words were said (no ASR pass exists; that is the documented upgrade path). The end-to-end test (`MYNA_E2E=1 pytest -m slow`) regenerates a script-to-audio run and asserts similarity > 0.75 on any machine.
 
 ## 8. Risks and mitigations
 
@@ -117,7 +120,8 @@ The end-to-end test (`MYNA_E2E=1 pytest -m slow`) regenerates these numbers on a
 | MPS regressions in future torch | device auto-fallback to CPU; `--device` override |
 | Long scripts drift or run out of memory | chunking bounds each generation; constant memory per chunk |
 | Reference clip quality sabotages the clone | enrolment validates duration/format; `--verify` scores every output; recording kit prevents the classic failures |
-| Similarity score fooled by silence/noise | RMS gate refuses to score near-silent audio (resemblyzer scores noise-vs-noise at 0.99) |
+| Similarity score fooled by silence/noise | RMS gate refuses to score near-silent audio (resemblyzer scores noise-vs-noise at 0.99). Known bound: the gate stops silence only — `--verify` measures speaker identity, not intelligibility or content; an ASR cross-check is the documented upgrade path |
+| Verification tautology (scoring against the conditioning clip) | enrolment reserves a held-out clip when ≥2 sources are given; `--verify` scores against the holdout and says so |
 | Voice-cloning misuse | local-only by design; outputs carry Resemble's [Perth watermark](https://github.com/resemble-ai/chatterbox#watermarking) baked into the engine; see red-team report |
 
 ## 9. Licence inventory
@@ -125,8 +129,9 @@ The end-to-end test (`MYNA_E2E=1 pytest -m slow`) regenerates these numbers on a
 | Component | Licence | Personal local use |
 |---|---|---|
 | Chatterbox code + weights | MIT | yes |
+| resemble-perth (watermarker, applied to every output) | MIT | yes |
 | resemblyzer | Apache 2.0 | yes |
-| CMU Arctic stand-in audio | BSD-style CMU licence ("any purpose... without fee") | yes |
+| CMU Arctic stand-in audio | CMU's BSD-style free licence ("any purpose... without fee") | yes |
 | Rainbow Passage / Harvard sentences (recording kit texts) | public domain / de facto public domain | yes |
 | torch, torchaudio | BSD-3 | yes |
 

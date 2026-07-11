@@ -23,7 +23,7 @@ _SENTENCE_END_CHARS = ".!?…"
 _KNOWN_ABBREVIATIONS = {
     "dr", "mr", "mrs", "ms", "prof", "sr", "jr", "st", "vs", "etc",
     "e.g", "i.e", "approx", "inc", "ltd", "co", "corp", "ave", "blvd",
-    "no", "u.s", "u.k", "vol", "fig", "dept",
+    "no", "u.s", "u.k", "vol", "fig", "dept", "p.m", "a.m",
 }
 
 _TRAILING_WORD_PATTERN = re.compile(r"([A-Za-z.]+)$")

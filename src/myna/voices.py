@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import subprocess
+import tempfile
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,7 +22,8 @@ from myna.config import (
 _NAME_PATTERN = re.compile(r"^[a-z0-9_-]{1,40}$")
 _SILENCE_GAP_SECONDS = 0.3
 _PEAK_TARGET = 0.9
-_AUDIO_EXTENSIONS = {".wav", ".flac", ".mp3"}
+_AUDIO_EXTENSIONS = {".wav", ".flac", ".mp3", ".m4a"}
+_FFMPEG_FALLBACK_DIRS = ("/opt/homebrew/bin", "/usr/local/bin")
 
 
 @dataclass
@@ -31,10 +35,16 @@ class VoiceInfo:
     source_files: list[str]
     duration_seconds: float
     sample_rate: int
+    holdout_file: str | None = None
 
     @property
     def reference_wav(self) -> Path:
         return voices_dir() / self.name / "reference.wav"
+
+    @property
+    def holdout_wav(self) -> Path | None:
+        path = voices_dir() / self.name / "holdout.wav"
+        return path if path.is_file() else None
 
 
 def _validate_name(name: str) -> None:
@@ -58,7 +68,7 @@ def _collect_source_files(sources: list[Path]) -> list[Path]:
             )
             if not found:
                 raise ValueError(
-                    f"no wav/flac/mp3 files found in directory: {source}"
+                    f"no wav/flac/mp3/m4a files found in directory: {source}"
                 )
             files.extend(found)
             continue
@@ -66,7 +76,7 @@ def _collect_source_files(sources: list[Path]) -> list[Path]:
         if source.suffix.lower() not in _AUDIO_EXTENSIONS:
             raise ValueError(
                 f"unsupported audio file type: {source} "
-                "(expected .wav, .flac, or .mp3)"
+                "(expected .wav, .flac, .mp3, or .m4a)"
             )
         files.append(source)
 
@@ -76,12 +86,77 @@ def _collect_source_files(sources: list[Path]) -> list[Path]:
     return files
 
 
+def _find_ffmpeg() -> str | None:
+    """Locate an ffmpeg binary, checking PATH then common Homebrew locations."""
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    for directory in _FFMPEG_FALLBACK_DIRS:
+        candidate = Path(directory) / "ffmpeg"
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def _load_waveform(audio_path: Path):
+    """Decode `audio_path` into a (waveform, sample_rate) pair.
+
+    torchaudio can decode wav/flac/mp3 directly, but has no bundled AAC
+    decoder on most systems and so fails on .m4a. When direct decode fails,
+    fall back to transcoding via the ffmpeg CLI into a temporary PCM16 wav
+    (channel count preserved) and decoding that instead.
+
+    Raises:
+        ValueError: if the file cannot be decoded directly or via ffmpeg.
+    """
+    import torchaudio
+
+    try:
+        return torchaudio.load(str(audio_path))
+    except Exception as exc:
+        ffmpeg_path = _find_ffmpeg()
+        if ffmpeg_path is None:
+            raise ValueError(
+                f"could not decode audio file: {audio_path} ({exc}); "
+                "install ffmpeg (brew install ffmpeg) to support this format."
+            ) from exc
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        try:
+            result = subprocess.run(
+                [
+                    ffmpeg_path, "-y", "-i", str(audio_path),
+                    "-c:a", "pcm_s16le", str(tmp_path),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                raise ValueError(
+                    f"could not decode audio file: {audio_path}; ffmpeg "
+                    f"transcoding failed: {result.stderr.strip()}; "
+                    "install ffmpeg (brew install ffmpeg) if it's missing "
+                    "or outdated."
+                )
+            return torchaudio.load(str(tmp_path))
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+
 def enroll(name: str, sources: list[Path]) -> VoiceInfo:
     """Build a reference clip for `name` from one or more source recordings.
 
     Each source is converted to mono, resampled to SAMPLE_RATE, and
     peak-normalized, then concatenated with short silence gaps and trimmed
     to MAX_REFERENCE_SECONDS.
+
+    When at least two source files are given and every file except the last
+    (in the same deterministic order used to build the reference) still
+    totals at least MIN_REFERENCE_SECONDS on its own, the last file is
+    reserved as a held-out clip (voices/<name>/holdout.wav) and excluded
+    from reference.wav, so `myna say --verify` can score against audio the
+    model was never conditioned on.
 
     Raises:
         ValueError: on an invalid name, a missing/unsupported source, or a
@@ -93,12 +168,9 @@ def enroll(name: str, sources: list[Path]) -> VoiceInfo:
     import torch
     import torchaudio
 
-    silence_samples = int(_SILENCE_GAP_SECONDS * SAMPLE_RATE)
-    silence = torch.zeros(1, silence_samples)
-
-    segments: list[torch.Tensor] = []
+    processed: list[torch.Tensor] = []
     for audio_path in files:
-        waveform, source_sr = torchaudio.load(str(audio_path))
+        waveform, source_sr = _load_waveform(audio_path)
         if waveform.shape[0] > 1:
             waveform = waveform.mean(dim=0, keepdim=True)
         if source_sr != SAMPLE_RATE:
@@ -108,6 +180,21 @@ def enroll(name: str, sources: list[Path]) -> VoiceInfo:
         if peak > 0:
             waveform = waveform * (_PEAK_TARGET / peak)
 
+        processed.append(waveform)
+
+    holdout_index: int | None = None
+    if len(files) >= 2:
+        remaining_seconds = sum(w.shape[1] for w in processed[:-1]) / SAMPLE_RATE
+        if remaining_seconds >= MIN_REFERENCE_SECONDS:
+            holdout_index = len(files) - 1
+
+    reference_waveforms = processed[:-1] if holdout_index is not None else processed
+
+    silence_samples = int(_SILENCE_GAP_SECONDS * SAMPLE_RATE)
+    silence = torch.zeros(1, silence_samples)
+
+    segments: list[torch.Tensor] = []
+    for waveform in reference_waveforms:
         segments.append(waveform)
         segments.append(silence)
 
@@ -129,12 +216,19 @@ def enroll(name: str, sources: list[Path]) -> VoiceInfo:
     reference_path = voice_dir / "reference.wav"
     torchaudio.save(str(reference_path), combined, SAMPLE_RATE)
 
+    holdout_file: str | None = None
+    if holdout_index is not None:
+        holdout_path = voice_dir / "holdout.wav"
+        torchaudio.save(str(holdout_path), processed[holdout_index], SAMPLE_RATE)
+        holdout_file = str(files[holdout_index])
+
     info = VoiceInfo(
         name=name,
         created=datetime.now(timezone.utc).isoformat(),
         source_files=[str(f) for f in files],
         duration_seconds=duration_seconds,
         sample_rate=SAMPLE_RATE,
+        holdout_file=holdout_file,
     )
     meta_path = voice_dir / "meta.json"
     meta_path.write_text(json.dumps(asdict(info), indent=2))
