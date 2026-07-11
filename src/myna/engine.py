@@ -1,0 +1,132 @@
+"""Voice-cloned speech synthesis engine for Myna."""
+
+from __future__ import annotations
+
+import random
+import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+
+from myna.chunk import DEFAULT_MAX_CHARS, split_script
+
+DEFAULT_EXAGGERATION = 0.5
+DEFAULT_CFG_WEIGHT = 0.5
+DEFAULT_TEMPERATURE = 0.8
+
+
+@dataclass
+class SynthesisReport:
+    """Summary of a completed synthesis run."""
+
+    chunk_count: int
+    audio_seconds: float
+    wall_seconds: float
+    realtime_factor: float
+    device: str
+    out_path: Path
+
+
+def _pick_device(requested: str | None) -> str:
+    import torch
+
+    if requested:
+        return requested
+    if torch.backends.mps.is_available():
+        return "mps"
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
+
+
+class MynaEngine:
+    """Wraps a lazily-loaded ChatterboxTTS model for voice-cloned synthesis."""
+
+    def __init__(self, device: str | None = None) -> None:
+        self._requested_device = device
+        self._device: str | None = None
+        self._model = None
+
+    @property
+    def device(self) -> str:
+        if self._device is None:
+            self._device = _pick_device(self._requested_device)
+        return self._device
+
+    def _load_model(self):
+        if self._model is not None:
+            return self._model
+
+        from chatterbox.tts import ChatterboxTTS
+
+        self._model = ChatterboxTTS.from_pretrained(device=self.device)
+        return self._model
+
+    def synthesize(
+        self,
+        script: str,
+        reference_wav: Path,
+        out_path: Path,
+        exaggeration: float = DEFAULT_EXAGGERATION,
+        cfg_weight: float = DEFAULT_CFG_WEIGHT,
+        temperature: float = DEFAULT_TEMPERATURE,
+        max_chars: int = DEFAULT_MAX_CHARS,
+        seed: int | None = None,
+    ) -> SynthesisReport:
+        """Synthesize `script` in the voice from `reference_wav`, writing `out_path`.
+
+        Raises:
+            ValueError: if `reference_wav` does not exist, or `script` is empty.
+        """
+        import torch
+        import torchaudio
+
+        if not reference_wav.is_file():
+            raise ValueError(f"reference audio not found: {reference_wav}")
+
+        chunks = split_script(script, max_chars=max_chars)
+
+        if seed is not None:
+            random.seed(seed)
+            torch.manual_seed(seed)
+
+        model = self._load_model()
+        model.prepare_conditionals(str(reference_wav), exaggeration=exaggeration)
+
+        start_time = time.monotonic()
+        pieces: list[torch.Tensor] = []
+        for index, chunk in enumerate(chunks, start=1):
+            print(
+                f"chunk {index}/{len(chunks)}: {len(chunk.text)} chars",
+                file=sys.stderr,
+            )
+            wav = model.generate(
+                chunk.text,
+                exaggeration=exaggeration,
+                cfg_weight=cfg_weight,
+                temperature=temperature,
+            )
+            pieces.append(wav)
+
+            is_last_chunk = index == len(chunks)
+            if not is_last_chunk and chunk.pause_after > 0:
+                silence_samples = int(chunk.pause_after * model.sr)
+                pieces.append(torch.zeros(1, silence_samples))
+
+        audio = torch.cat(pieces, dim=1)
+        wall_seconds = time.monotonic() - start_time
+
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        torchaudio.save(str(out_path), audio, model.sr)
+
+        audio_seconds = audio.shape[1] / model.sr
+        realtime_factor = audio_seconds / wall_seconds if wall_seconds > 0 else 0.0
+
+        return SynthesisReport(
+            chunk_count=len(chunks),
+            audio_seconds=audio_seconds,
+            wall_seconds=wall_seconds,
+            realtime_factor=realtime_factor,
+            device=self.device,
+            out_path=out_path,
+        )

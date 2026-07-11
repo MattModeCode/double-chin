@@ -1,0 +1,6 @@
+file '/Users/mc/Documents/GitHub/ChinAI/demo/assets/arctic_0001.wav'
+file '/Users/mc/Documents/GitHub/ChinAI/demo/assets/arctic_0002.wav'
+file '/Users/mc/Documents/GitHub/ChinAI/demo/assets/arctic_0003.wav'
+file '/Users/mc/Documents/GitHub/ChinAI/demo/assets/arctic_0005.wav'
+file '/Users/mc/Documents/GitHub/ChinAI/demo/assets/arctic_0008.wav'
+file '/Users/mc/Documents/GitHub/ChinAI/demo/assets/ref_a.wav'
