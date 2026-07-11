@@ -20,8 +20,8 @@
 | T9 | Red team: adversarial review of claims + product | Opus agent (read-only) | DONE — 9 findings (1 CRITICAL .m4a); published docs/red-team.md; code fixes dispatched to batch fix worker (sonnet, write set src/{voices,engine,cli}.py + tests); docs reworded by LEAD | 1 |
 | T13 | Mirror-test quiz (unexpected deliverable): 3 real vs 3 clone held-out clips + demo/mirror-test.html | LEAD + bg myna runs | DONE — clone-vs-real similarity 0.843–0.912 (strong match on held-out sentences) | 1 |
 | T10 | Blind verification: core package on committed state | foreman-verifier | DONE — PASS_WITH_NOTES (2 LOW code findings held for batch fix; e2e say verified by LEAD: 39.4 s, similarity 0.954) | 1 |
-| T11 | Completeness critic vs definition of done | foreman-verifier | DISPATCHED (bg) | 1 |
-| T12 | Commit + push per auto-ship rule | LEAD | IN PROGRESS — 3 commits on build/myna; push pending critic PASS | 1 |
+| T11 | Completeness critic vs definition of done | foreman-verifier | DONE — PASS_WITH_NOTES; both notes (test count 28→30, doctor warning) fixed | 1 |
+| T12 | Commit + push per auto-ship rule | LEAD | DONE — 6 commits pushed to build/myna; PR #1 opened to main | 1 |
 | T14 | Slow e2e proof (real model asserts similarity>0.75) | LEAD-run | DONE — `MYNA_E2E=1 pytest -m slow`: 1 passed, 17.1s | 1 |
 | T8 | Demo + walkthrough videos | WORKHORSE (sonnet) | DONE — demo 65.4s, walkthrough 90.9s, both h264+aac, audio -17.8/-19.8 dB; narration verified 0.948 | 1 |
 | T7 | Brand + README + recap.html | LEAD | DONE — recap.html validated (clean markup, valid fonts, 18/18 links resolve, 2 audio + 2 video embeds) | 1 |
