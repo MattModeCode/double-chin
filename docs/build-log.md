@@ -25,7 +25,7 @@ Format: **Q** (the question) / **A** (the call) / **Why** (the reasoning and evi
 
 ### D4 — Demo voice without the user's audio
 **Q:** The mission says the only permitted stop is to request the user's training recordings. Stop now, or build first?
-**A:** Build the entire pipeline first using a stand-in reference voice from free corpora (CMU Arctic speaker `bdl`, free X11-style license; VOiCES/torchaudio tutorial clip, CC-BY 4.0). Ship a recording-script kit so the user can swap in their own voice with one command.
+**A:** Build the entire pipeline first using a stand-in reference voice from free corpora (CMU Arctic speaker `bdl`, CMU's BSD-style free licence; VOiCES/torchaudio tutorial clip, CC-BY 4.0). Ship a recording-script kit so the user can swap in their own voice with one command.
 **Why:** Stopping first would idle the whole build on a human round-trip. Zero-shot cloning is voice-agnostic: proving the pipeline on a stand-in voice proves it for the user's voice, because the engine never trains — it conditions on whatever reference WAV is supplied. The recording kit makes the swap trivial.
 
 ### D5 — ffmpeg
@@ -47,6 +47,16 @@ Format: **Q** (the question) / **A** (the call) / **Why** (the reasoning and evi
 **Q:** Does Chatterbox actually clone on this Mac?
 **A:** Yes. Model loads on MPS in 7–9 s; a novel sentence cloned against the 16.7 s CMU Arctic stand-in reference scored **0.902** cosine similarity (resemblyzer GE2E) — above the 0.80 "strong match" bar. RTF ≈ 4.8 on first calls.
 **Why it took three attempts:** (1) uv venvs ship no setuptools → perth watermarker degraded to `None` → `TypeError` at load; (2) setuptools 83 still lacks `pkg_resources`; fix is `setuptools<81`, now a hard pin. Logged as reproducible landmines in design.md §2.
+
+### D10 — Negative control for the similarity claim
+**Q:** Is 0.95 clone-vs-reference similarity meaningful without a different-speaker baseline?
+**A:** Measured it. Clone vs a *different* real speaker (VOiCES sp0307): 0.713. Two real different speakers against each other: 0.672. Same-speaker clone vs its reference: 0.954.
+**Why:** Pre-empts the obvious red-team objection. The 0.75 match threshold correctly separates both different-speaker controls from the clone; the honest caveat is that similar-register male English narrators sit ~0.7, not 0.3–0.6, so scores must be read against that floor. Numbers recorded before the red team reported, and handed to it.
+
+### D11 — Red-team remediation scope
+**Q:** The red team found one CRITICAL (.m4a rejected), three HIGH, three MEDIUM, two LOW. Fix everything or reword?
+**A:** Fix in code: F1 (.m4a with ffmpeg fallback), F2 (real holdout verification at enrolment), F5 (set `HF_HUB_DISABLE_XET=1` in the engine), F6 (e2e asserts similarity > 0.75), F7 (one speed convention). Reword in docs with full disclosure: F3 (judge is same-family, negative controls beside headline numbers), F4 (verify measures who, not what), F5 (locality scoped to audio), F8 (5 s floor, watermark limits), F9 (licence rows). Not built: ASR intelligibility gate (documented as the upgrade path).
+**Why:** Everything that changes what a user experiences got a code fix; everything that was a truth-in-advertising problem got the honest sentence the red team asked for. An ASR pass would add a Whisper-class dependency for a check the user's own ears do better at this scale — documented instead of built (ship the strong 80%).
 
 ### D7 — Hook friction
 **Q:** A GateGuard fact-forcing hook intercepts first writes/commands and demands stated facts. Disable it?

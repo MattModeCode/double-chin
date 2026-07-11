@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
     enroll_parser.add_argument("name", help="Voice name (lowercase letters, digits, '-', '_').")
     enroll_parser.add_argument(
         "sources", nargs="+", type=Path,
-        help="Audio files (.wav/.flac/.mp3) or a directory containing them.",
+        help="Audio files (.wav/.flac/.mp3/.m4a) or a directory containing them.",
     )
 
     say_parser = subparsers.add_parser(
@@ -111,13 +111,19 @@ def _cmd_say(args: argparse.Namespace) -> int:
         f"{report.chunk_count} chunks)"
     )
     print(
-        f"Device: {report.device}; wall time {report.wall_seconds:.1f}s; "
-        f"realtime factor {report.realtime_factor:.2f}x"
+        f"Device: {report.device}; speed {report.speed_ratio:.2f}x realtime "
+        f"({report.wall_seconds:.1f} s wall for {report.audio_seconds:.1f} s audio)"
     )
 
     if args.verify:
-        score = similarity(reference_wav, report.out_path)
-        print(f"Speaker similarity: {score:.3f} ({verdict(score)})")
+        if args.voice and voice.holdout_wav is not None:
+            compare_wav = voice.holdout_wav
+            label = "held-out clip"
+        else:
+            compare_wav = reference_wav
+            label = "reference (no holdout enrolled)"
+        score = similarity(compare_wav, report.out_path)
+        print(f"Speaker similarity vs {label}: {score:.3f} ({verdict(score)})")
 
     return 0
 
@@ -227,6 +233,9 @@ def main(argv: list[str] | None = None) -> int:
         return 130
     except ValueError as exc:
         print(f"myna: error: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:  # torch/audio backends raise their own types
+        print(f"myna: error: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
 
 

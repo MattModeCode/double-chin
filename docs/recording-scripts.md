@@ -85,7 +85,7 @@ Test it immediately:
 myna say "This is my voice clone speaking." --voice me -o test.wav --verify
 ```
 
-`--verify` prints a similarity score comparing the generated audio to your reference:
+`--verify` prints a similarity score comparing the generated audio to a held-out clip from your recordings (when you enrolled two or more files, Myna reserves the last one for exactly this check — it is never part of the reference the model imitates). The score measures who the output sounds like, not what was said, so still listen to your first take:
 
 - **≥ 0.75** — good match, you're done
 - **0.60–0.75** — usable but marginal; a re-recording of the noisiest file will likely improve it

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import random
 import sys
 import time
@@ -17,12 +18,16 @@ DEFAULT_TEMPERATURE = 0.8
 
 @dataclass
 class SynthesisReport:
-    """Summary of a completed synthesis run."""
+    """Summary of a completed synthesis run.
+
+    `speed_ratio` is audio seconds produced per wall-clock second (e.g. 0.21
+    means synthesis ran at ~1/5th realtime speed, not "4.8x realtime").
+    """
 
     chunk_count: int
     audio_seconds: float
     wall_seconds: float
-    realtime_factor: float
+    speed_ratio: float
     device: str
     out_path: Path
 
@@ -56,6 +61,11 @@ class MynaEngine:
     def _load_model(self):
         if self._model is not None:
             return self._model
+
+        # Xet-backed downloads have been observed to stall indefinitely on
+        # this network; disable Xet before the chatterbox import triggers
+        # any Hugging Face Hub activity.
+        os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
         from chatterbox.tts import ChatterboxTTS
 
@@ -120,13 +130,13 @@ class MynaEngine:
         torchaudio.save(str(out_path), audio, model.sr)
 
         audio_seconds = audio.shape[1] / model.sr
-        realtime_factor = audio_seconds / wall_seconds if wall_seconds > 0 else 0.0
+        speed_ratio = audio_seconds / wall_seconds if wall_seconds > 0 else 0.0
 
         return SynthesisReport(
             chunk_count=len(chunks),
             audio_seconds=audio_seconds,
             wall_seconds=wall_seconds,
-            realtime_factor=realtime_factor,
+            speed_ratio=speed_ratio,
             device=self.device,
             out_path=out_path,
         )
