@@ -184,7 +184,13 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
         print("WARN torch: not installed")
 
     try:
-        import resemblyzer  # noqa: F401
+        import warnings
+
+        with warnings.catch_warnings():
+            # webrtcvad (a resemblyzer dep) imports the deprecated pkg_resources
+            # on import; that notice is harmless noise on a diagnostics command.
+            warnings.simplefilter("ignore")
+            import resemblyzer  # noqa: F401
 
         print("PASS resemblyzer: importable")
     except ImportError:
