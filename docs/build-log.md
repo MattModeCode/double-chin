@@ -58,6 +58,43 @@ Format: **Q** (the question) / **A** (the call) / **Why** (the reasoning and evi
 **A:** Fix in code: F1 (.m4a with ffmpeg fallback), F2 (real holdout verification at enrolment), F5 (set `HF_HUB_DISABLE_XET=1` in the engine), F6 (e2e asserts similarity > 0.75), F7 (one speed convention). Reword in docs with full disclosure: F3 (judge is same-family, negative controls beside headline numbers), F4 (verify measures who, not what), F5 (locality scoped to audio), F8 (5 s floor, watermark limits), F9 (licence rows). Not built: ASR intelligibility gate (documented as the upgrade path).
 **Why:** Everything that changes what a user experiences got a code fix; everything that was a truth-in-advertising problem got the honest sentence the red team asked for. An ASR pass would add a Whisper-class dependency for a check the user's own ears do better at this scale — documented instead of built (ship the strong 80%).
 
+## 2026-07-11 — Second mission: the application (`application-prompt.md`)
+
+### D12 — Application shape (tournament)
+**Q:** The CLI exists; the new mission demands one launchable application with a real interface. What shape?
+**A:** **Myna Studio** — a FastAPI backend + hand-built single-page frontend (vanilla HTML/CSS/JS, no build step), launched with `myna studio`, which starts a loopback-only server and opens the browser. Live chunk progress over SSE; one synthesis job at a time (HTTP 409 otherwise); history appended to a jsonl under `MYNA_HOME`.
+**Why:** Three independent architect agents pitched competing shapes (FastAPI+SPA, Gradio 6, pywebview desktop shell); an independent judge scored them on product feel, launch robustness, progress UX, offline testability, autonomous-build risk, and brandability. FastAPI+SPA won 845/1000 vs 705 (pywebview) and 580 (Gradio). Deciding facts: the demo video must be recorded by driving the real interface in Chrome — impossible against a WKWebView native window — and Gradio's component chrome can't carry a bespoke brand. Salvaged from the losers: jsonl history (Gradio pitch) and the explicit 127.0.0.1-only bind as a stated security property (pywebview pitch). Conditions honoured from the judge: sentinel-terminated SSE stream and the 409 concurrent-job guard.
+
+### D13 — Engine progress surface
+**Q:** The app needs live per-chunk progress, but the engine only printed progress to stderr. Scrape stderr or change the engine?
+**A:** Added an optional `progress(index, total, text)` callback parameter to `MynaEngine.synthesize` — backward compatible, covered by two new offline tests against a fake model (suite now 32 passing).
+**Why:** A real callback is testable and race-free; stderr scraping (what the Gradio pitch had to invent) is fragile and couples the UI to log formatting. The stderr print stays for CLI users.
+
+### D14 — The owner's private content stays out of the repo
+**Q:** The owner dropped personal scripts (`voice clone scripts/`: a school piece and a message to a partner) and their real voice recordings into the working tree. Commit them?
+**A:** No — `voice clone scripts/` joined `*.m4a` in `.gitignore`. Everything the owner feeds the app stays local; committed demo artifacts use only the licence-free stand-in voice.
+**Why:** Guardrail 2 (publish nothing). The GitHub remote outlives this session's privacy expectations; the repo is private today, but a repo's visibility is one click from changing, and personal messages and biometric-adjacent audio don't belong in git history at all.
+
+### D15 — Demo recording toolchain
+**Q:** The demo must show the real interface being driven, but this machine has no Google Chrome (Arc and Safari only) and the Chrome-extension automation path refused to connect. Stall, or reroute?
+**A:** Playwright (free pip install) driving its own Chromium, which also records the session as video natively — the webm becomes the demo mp4's core footage.
+**Why:** Guardrail 3: blocked is not an option. Playwright turned out stronger than the original plan — deterministic scripted driving, pixel-exact viewport, built-in video — and it doubles as the live E2E harness. Irony noted: the tournament judged the pywebview pitch partly on Chrome-extension recordability, but the deciding criterion — "a localhost page any Chromium can drive" — held; only the specific tool changed.
+
+### D16 — Privacy re-record of the demo video
+**Q:** Frame-by-frame review of the first demo cut caught the owner's personal message run ("Hi my love…", voice `me`) visible in the app's History panel. Ship it, blur it, or re-record?
+**A:** Re-record the whole session against an isolated `MYNA_HOME` containing only the licence-free stand-in voice, so no personal content can appear in any committed pixel.
+**Why:** Guardrail 2. Blurring is fragile and admits the leak into git history; a clean-room re-record is cheap (the take is seeded, so the audio is byte-identical: same 1,211,600-byte wav, same 0.921 score) and structurally safe. This is also why watching your own videos is a real step, not a checkbox.
+
+### D17 — Whose audio plays in the demo
+**Q:** The demo video needs sound. Narrate it, or let the product speak?
+**A:** The audio the video ends on is the exact take generated during the recorded session (seed 7, stand-in voice) — the product demonstrating itself. The owner's cloned voice is never committed; their UI run (0.885 vs holdout on their own script) is reported as a number only.
+**Why:** A demo that plays its own output is the strongest honest evidence the interface produces audio; using the owner's voice would trade a guardrail for flair.
+
+### D18 — What "my voice rules" means
+**Q:** The definition of done requires "the demo script passes my voice rules," but no voice-rules document exists in the repo. Whose rules?
+**A:** The owner's brand voice system (the MashuAI contract that governs everything user-facing here): plain and confident, sentence case, say what the thing does, no hype, no exclamation marks, no emoji. The Studio demo script and every on-screen string were written and checked against those rules.
+**Why:** It is the only voice standard the owner maintains, it is loaded into every session that builds user-facing work, and the completeness critic flagged the criterion as unfalsifiable without naming a standard — so the standard is now named.
+
 ### D7 — Hook friction
 **Q:** A GateGuard fact-forcing hook intercepts first writes/commands and demands stated facts. Disable it?
 **A:** No — comply inline by stating the facts before gated operations.

@@ -63,6 +63,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("doctor", help="Report environment diagnostics.")
 
+    studio_parser = subparsers.add_parser(
+        "studio", help="Launch Myna Studio, the local web application."
+    )
+    studio_parser.add_argument(
+        "--port", type=int, default=8787, help="Port to serve on (default: 8787)."
+    )
+    studio_parser.add_argument(
+        "--no-browser", action="store_true",
+        help="Don't open the browser automatically.",
+    )
+
     return parser
 
 
@@ -220,12 +231,34 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_studio(args: argparse.Namespace) -> int:
+    import threading
+    import webbrowser
+
+    import uvicorn
+
+    from myna.studio.app import create_app
+
+    url = f"http://127.0.0.1:{args.port}"
+    print(f"Myna Studio: {url}  (Ctrl-C to stop)")
+
+    if not args.no_browser:
+        # Give uvicorn a moment to bind before the browser asks for the page.
+        threading.Timer(1.0, webbrowser.open, args=(url,)).start()
+
+    # Loopback only, by design: Studio has no auth layer and must never
+    # listen on a routable interface.
+    uvicorn.run(create_app(), host="127.0.0.1", port=args.port, log_level="warning")
+    return 0
+
+
 _HANDLERS = {
     "enroll": _cmd_enroll,
     "say": _cmd_say,
     "voices": _cmd_voices,
     "verify": _cmd_verify,
     "doctor": _cmd_doctor,
+    "studio": _cmd_studio,
 }
 
 

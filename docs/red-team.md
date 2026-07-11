@@ -74,6 +74,32 @@ Chatterbox weights verified MIT on the live HF model card; resemblyzer Apache-2.
 
 ▸ **Addressed in docs:** perth row added; licence naming unified.
 
+## Round 2 — the application layer (Myna Studio), 2026-07-11
+
+A second adversarial pass ran after the FastAPI application was built, with the same mandate against `src/myna/studio/`, the CLI `studio` command, and the §10 claims. It ran the offline suite, built a real wheel, and read every source file; it did not start a server or load the model. Findings and remediation (▸):
+
+### C1 — CRITICAL (process, not code). At review time the whole application was uncommitted; `pip install -e .` at HEAD gave the old CLI.
+▸ **Resolved by shipping:** this changeset commits `src/myna/studio/`, tests, the `studio` subcommand, the three new dependencies, and every doc together. Verified positive by the reviewer: `uv build` produces a wheel containing `myna/studio/**` including the self-hosted fonts, so packaging works once committed.
+
+### C2 — CRITICAL. "Loopback only ⇒ no auth bypass matters" was false. A local server with no auth is reachable by *any* web page in the same browser: cross-origin CSRF (a `no-cors` POST is always sent) could enroll or silently overwrite a voice or start a job; DNS rebinding could then read history and audio.
+▸ **Fixed in code:** `app.py` now runs a `local_origin_guard` middleware that rejects any request whose `Host` header isn't loopback (defeats DNS rebinding) and any request carrying a cross-origin `Origin` (defeats browser CSRF) — the Jupyter/Ollama pattern. Verified live: same-origin browser → 200; `Origin: http://evil.example` POST → 403; `Host: attacker.example` → 403 (`tests/test_studio.py::test_cross_origin_and_bad_host_refused`). The doc claim is reworded from "no auth bypass matters" to describe the actual guard.
+
+### H1 — HIGH. Enrolling a name that already exists silently overwrote the prior voice's reference.
+▸ **Fixed in code:** the enroll endpoint returns **409** on a name collision unless `overwrite=true` is sent explicitly (`test_enroll_collision_then_overwrite`). (The CLI's own `enroll` still overwrites, as a local user typing a name owns that name; the network endpoint is the untrusted surface.)
+
+### H2 — HIGH. §10 said its bullets were "verifiable in tests/test_studio.py"; several weren't (SSE replay-from-cursor, the 20k-char cap, history corrupt-line resilience).
+▸ **Fixed:** those tests now exist (`test_sse_replay_from_cursor`, `test_job_text_over_limit_422`, `test_history_skips_corrupt_lines`), suite up from 44 to 51.
+
+### M1 — MEDIUM. The in-memory job dict grew unbounded over a long session.
+▸ **Fixed in code:** finished jobs are pruned to the most recent 50 (`_MAX_RETAINED_JOBS`, `test_jobs_pruned_to_cap`); the durable record is `history.jsonl` on disk, so nothing is lost.
+
+### M2 — MEDIUM. The enroll upload had no file-count or size cap (disk-fill DoS, amplified by C2).
+▸ **Fixed in code:** max 24 files and 200 MB total, streamed to disk in 1 MB chunks (`test_enroll_too_many_files`; 413 on byte overflow).
+
+### M3 / L1 / L2 — the 0.921 figure is a single measurement (honestly caveated as not bit-exact); engine stderr prints during a run (cosmetic); `job_id.isalnum()` accepts more than hex but still blocks traversal. Accepted as-is with the caveats stated in §10.
+
+**What round 2 confirmed holds (verified, not assumed):** no external requests from the UI (only a `data:` favicon); no XSS (every user/job string rendered via `textContent`/`createTextNode`); no path traversal on `/api/audio` or in upload filename handling; the 409 guard and the SSE `Condition` design are race-free by inspection (status and terminal event written under one lock); the demo screenshots contain no personal content (D16 re-record verified); `.gitignore` correctly excludes the owner's recordings and scripts.
+
 ## Bounding claim 2 (speaker-agnostic)
 
 The mechanism argument is sound: no per-speaker training exists, so the code path is identical for any reference. But "proven on a stand-in proves it for you" is bounded by: (1) the stand-in is a studio-clean, same-register, native-English male narrator — the *easy* case; accents, non-native speakers, atypical voices, and cross-register requests are untested and the zero-shot literature shows they degrade; (2) quality-in/quality-out means the result is dominated by reference capture, and F1 showed the capture path itself was broken for the recommended tools; (3) the design doc's "honest limits" paragraph is the strongest honesty in the repo and should stay. Net: speaker-agnostic in code, "proven for one favourable speaker, plausibly generalizes, untested at the distribution edges."

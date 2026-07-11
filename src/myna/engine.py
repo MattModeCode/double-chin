@@ -8,6 +8,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from myna.chunk import DEFAULT_MAX_CHARS, split_script
 
@@ -82,8 +83,12 @@ class MynaEngine:
         temperature: float = DEFAULT_TEMPERATURE,
         max_chars: int = DEFAULT_MAX_CHARS,
         seed: int | None = None,
+        progress: Callable[[int, int, str], None] | None = None,
     ) -> SynthesisReport:
         """Synthesize `script` in the voice from `reference_wav`, writing `out_path`.
+
+        `progress`, when given, is called at the start of each chunk with
+        (chunk_index_1based, chunk_count, chunk_text).
 
         Raises:
             ValueError: if `reference_wav` does not exist, or `script` is empty.
@@ -106,6 +111,8 @@ class MynaEngine:
         start_time = time.monotonic()
         pieces: list[torch.Tensor] = []
         for index, chunk in enumerate(chunks, start=1):
+            if progress is not None:
+                progress(index, len(chunks), chunk.text)
             print(
                 f"chunk {index}/{len(chunks)}: {len(chunk.text)} chars",
                 file=sys.stderr,

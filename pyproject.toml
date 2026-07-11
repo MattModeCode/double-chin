@@ -11,6 +11,9 @@ dependencies = [
     "chatterbox-tts",
     "resemblyzer",
     "setuptools<81",
+    "fastapi",
+    "uvicorn",
+    "python-multipart",
 ]
 
 [project.scripts]
