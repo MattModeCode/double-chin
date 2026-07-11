@@ -2,7 +2,7 @@
 
 Your voice, on script.
 
-Myna is a local voice-cloning CLI. Give it a text script and a few seconds of someone's voice, and it reads the script aloud in that voice — entirely on your machine. No cloud, no account, no audio leaving the laptop.
+Myna is a local voice-cloning application. Give it a text script and a few seconds of someone's voice, and it reads the script aloud in that voice — entirely on your machine. No cloud, no account, no audio leaving the laptop. One command launches **Myna Studio**, the web interface where you enroll voices, type or load a script, watch it synthesize chunk by chunk, and hear the result with a speaker-similarity verdict; the same pipeline is also scriptable from the `myna` CLI.
 
 **The proof:** a cloned single sentence scored **0.902** and a full 39 s script **0.954** cosine similarity against the reference voice, on a separate speaker-verification model (resemblyzer — different weights, same GE2E family as the engine's conditioning). Negative controls: a *different* real speaker scores 0.672–0.713 on the same metric, so the clone sits far above the wrong-speaker floor. Method, caveats, and full numbers: [docs/design.md §7](docs/design.md). Hear it: [`demo/`](demo/). Try to spot it: [`demo/mirror-test.html`](demo/mirror-test.html).
 
@@ -21,6 +21,18 @@ uv pip install --python .venv/bin/python -e ".[dev]"
 source .venv/bin/activate
 myna doctor          # checks device, deps, disk — everything should PASS
 ```
+
+## The application
+
+```bash
+myna studio          # starts http://127.0.0.1:8787 and opens your browser
+```
+
+![Myna Studio after a verified generation](demo/studio/05-done.png)
+
+Everything happens in one screen: pick an enrolled voice (or enroll one by uploading recordings), paste a script or load a `.txt`, tune delivery (exaggeration / reference adherence / temperature / seed), and Generate. Progress streams live — you watch each chunk land as it's synthesized — then the take auto-plays with its similarity score and verdict, and every generation is kept in a browsable, replayable history under `~/.myna/studio/`. The server binds to 127.0.0.1 only and a same-origin guard rejects cross-origin and rebound-host requests — Studio has no auth layer, so it refuses anything but the local page (the fix a red team's CSRF/DNS-rebinding finding forced; see [docs/red-team.md](docs/red-team.md)). Watch it run: [`demo/myna-studio-demo.mp4`](demo/myna-studio-demo.mp4) — a real session recorded through the interface, ending with the audio that session generated (0.921 vs holdout).
+
+Studio doubles as a local HTTP API (`/api/voices`, `/api/jobs`, SSE progress at `/api/jobs/{id}/events`, `/api/history`, `/api/audio/{id}`) — see [docs/design.md §10](docs/design.md) for the surface and the job model.
 
 ## First clone (60 seconds, stand-in voice)
 
@@ -50,6 +62,7 @@ myna say --script your-script.txt --voice me -o out.wav --verify
 
 | Command | Does |
 |---|---|
+| `myna studio` | Launch the Myna Studio application (`--port`, `--no-browser`) |
 | `myna enroll NAME SRC...` | Build a voice from recordings (wav/m4a/mp3/flac; files or a folder) |
 | `myna say TEXT \| --script FILE` | Synthesize speech; `--voice NAME` or `--ref WAV`; `-o OUT.wav` |
 | `myna voices` | List enrolled voices |
@@ -68,22 +81,25 @@ Zero-shot conditioning, not training: [Chatterbox TTS](https://github.com/resemb
 
 ```
 src/myna/        the package: cli, engine, chunk, voices, verify, config
-tests/           unit suite (offline, <1 s) + slow e2e (MYNA_E2E=1)
+src/myna/studio/ the application: FastAPI server, jobs, history, static UI
+tests/           unit suite (offline, ~2 s) + slow e2e (MYNA_E2E=1)
 docs/            design doc, build log, recording kit, red-team report
-demo/            demo script, generated audio, videos, stand-in voice assets
+demo/            demo scripts, generated audio, videos, UI screenshots
 recap.html       the five-minute tour of everything in this repo
 ```
 
 ## Tests
 
 ```bash
-pytest -m "not slow" -q       # 30 unit tests, offline, ~1 s
+pytest -m "not slow" -q       # 51 unit tests, offline, ~2 s (engine, CLI, studio API)
 MYNA_E2E=1 pytest -m slow -q  # real script-to-audio run (loads the model)
 ```
 
+The studio tests inject a fake engine through the app factory, so the whole HTTP surface — enrolment upload, job lifecycle, SSE progress stream, 409 concurrency guard, history, audio serving — runs offline in-process.
+
 ## Responsible use
 
-Myna is built for cloning **your own voice** on your own machine. Be clear-eyed about what that means: enrolment works from as little as 5 seconds of audio, and while every output carries Resemble's [Perth audio watermark](https://github.com/resemble-ai/chatterbox#watermarking) via the engine, that watermark is an invisible provenance signal — it can be weakened by re-encoding and Myna ships no detector for it. It is not a control, just a marker. Don't clone a voice you don't have the right to clone. Your recordings and voices never leave the machine (the only network use is the one-time model download from Hugging Face); the adversarial review of every claim in this project is in [docs/red-team.md](docs/red-team.md).
+Myna is built for cloning **your own voice** on your own machine. Be clear-eyed about what that means: enrolment works from as little as 5 seconds of audio, and while every output carries Resemble's [Perth audio watermark](https://github.com/resemble-ai/chatterbox#watermarking) via the engine, that watermark is an invisible provenance signal — it can be weakened by re-encoding and Myna ships no detector for it. It is not a control, just a marker. Don't clone a voice you don't have the right to clone. Every enrolled voice can carry a [voice passport](demo/voice-passport-standin.html) — a provenance card stating what it was built from, how it verifies, and that deleting its folder revokes it entirely (`demo/make_voice_passport.py`). Your recordings and voices never leave the machine (the only network use is the one-time model download from Hugging Face); the adversarial review of every claim in this project is in [docs/red-team.md](docs/red-team.md).
 
 ## Licences
 

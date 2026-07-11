@@ -7,3 +7,6 @@ myna_out.wav
 
 # Personal voice recordings — biometric data, never commit to the public repo
 *.m4a
+
+# Personal scripts the owner feeds the app — private content, never commit
+voice clone scripts/

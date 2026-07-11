@@ -26,6 +26,23 @@
 | T8 | Demo + walkthrough videos | WORKHORSE (sonnet) | DONE — demo 65.4s, walkthrough 90.9s, both h264+aac, audio -17.8/-19.8 dB; narration verified 0.948 | 1 |
 | T7 | Brand + README + recap.html | LEAD | DONE — recap.html validated (clean markup, valid fonts, 18/18 links resolve, 2 audio + 2 video embeds) | 1 |
 
+## Second mission — the application (application-prompt.md, 2026-07-11)
+| ID | Task | Seat | Status | Attempts |
+|----|------|------|--------|----------|
+| A1 | Architecture tournament: 3 pitches (FastAPI+SPA, Gradio, pywebview) + independent judge | 3× WORKHORSE pitches + WORKHORSE judge | DONE — FastAPI+SPA 845/1000; D12 | 1 |
+| A2 | Engine progress callback (tests first) | LEAD | DONE — 2 tests, suite 32 | 1 |
+| A3 | Studio backend: app.py, jobs.py, history.py + CLI `studio` + pyproject deps | LEAD | DONE — SSE replay-from-cursor design, 409 guard, loopback-only | 1 |
+| A4 | Studio frontend: branded SPA (index/style/app), fonts bundled | LEAD (mashuai-brand loaded) | DONE — no external requests | 1 |
+| A5 | Offline app test suite | LEAD | DONE — 12 studio tests, suite 44 passing | 1 |
+| A6 | Live E2E through the UI (Playwright; Chrome absent → D15) | LEAD-run | DONE — 0.921 vs holdout via browser; owner's voice 0.885 (local only) | 2 |
+| A7 | Studio demo video (session recording + take audio) | LEAD-run | DONE — 69 s, watched frame-by-frame; privacy re-record D16 | 2 |
+| A8 | Docs: README app section, design §10, build-log D12–D17, recap rework | LEAD | DONE | 1 |
+| A9 | Unexpected deliverable: voice passport (generator + standin card) | LEAD | DONE — rendered verified | 1 |
+| A10 | Red team round 2 (app claims) | WORKHORSE (adversarial) | DISPATCHED | 1 |
+| A11 | Completeness critic vs DoD | WORKHORSE | DISPATCHED | 1 |
+| A12 | Wheel packaging check (static assets ship) | LEAD-run | DONE — static/, fonts in wheel | 1 |
+| A13 | Ship: commit, push, PR update | LEAD | PENDING | 0 |
+
 ## Attempts log (append-only)
 - T1 attempt 1: dispatched general-purpose bg agent (model landscape) — pre-foreman, reconciled here.
 - T2 attempt 1: dispatched general-purpose bg agent (data/verification) — pre-foreman, reconciled here.

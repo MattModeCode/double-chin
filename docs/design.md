@@ -93,7 +93,7 @@ Design rules: heavy imports are lazy so `myna --help` and unit tests run instant
 - **Chunking at 280 chars.** Chatterbox degrades on very long single generations (autoregressive drift; community guidance keeps utterances short). Sentence-aware chunks with 0.35 s intra-paragraph / 0.7 s paragraph pauses read naturally and bound both latency-to-first-audio and failure blast radius.
 - **Knobs surfaced, defaults sane.** `exaggeration` (emotion intensity, default 0.5), `cfg_weight` (reference adherence vs. liveliness, default 0.5), `temperature` (default 0.8) pass straight through to the engine ([API](https://github.com/resemble-ai/chatterbox)); `--seed` gives reproducible takes.
 - **Speed.** MPS on the M5 Pro: model load 7–9 s; measured synthesis speed ≈ 0.21× realtime on first calls (§7) — a 60 s narration costs roughly five minutes of wall time. The CLI prints this same convention ("speed 0.21x realtime"). CPU fallback works but is several times slower; `myna doctor` reports which device you'll get. If sustained throughput ever matters more than simplicity, the MLX route (same weights) is the documented upgrade path.
-- **Determinism.** Same seed + same inputs → same audio; without a seed, takes vary like human takes do. This is a feature for narration work (re-roll a flat line).
+- **Determinism.** Same seed + same inputs → the same take across fresh launches (measured byte-identical twice in §10); reruns inside a warm process can drift at the sample level on MPS without changing how the take sounds or scores. Without a seed, takes vary like human takes do — a feature for narration work (re-roll a flat line).
 
 ## 7. Measured results (this machine)
 
@@ -139,3 +139,31 @@ Read the scores against the measured wrong-speaker floor (~0.67–0.71 for same-
 | torch, torchaudio | BSD-3 | yes |
 
 Nothing in the stack restricts personal local use; F5-TTS's NC weights were avoided anyway by picking Chatterbox.
+
+## 10. The application layer: Myna Studio
+
+The second mission ([application-prompt.md](../application-prompt.md), 2026-07-11) asked for the pipeline wrapped in one launchable application. The shape was decided by a three-way architecture tournament (FastAPI+SPA vs Gradio 6 vs pywebview desktop shell) scored by an independent judge — 845/1000 for FastAPI+SPA; full scoring and rationale in [build-log.md D12](build-log.md). `myna studio` starts a FastAPI server on `127.0.0.1:8787` and opens the browser on a hand-built single-page UI (vanilla HTML/CSS/JS, no build step, no external requests — fonts ship with the package).
+
+```mermaid
+flowchart LR
+    B[browser SPA<br/>static/] -- "POST /api/jobs" --> A[FastAPI app]
+    A -- 202 job_id --> B
+    A --> M[JobManager<br/>one worker thread]
+    M -- progress callback --> E[MynaEngine<br/>loaded once, MPS]
+    M -- append --> H[(MYNA_HOME/studio/<br/>jobs/id/out.wav + history.jsonl)]
+    B -- "SSE /api/jobs/id/events" --> A
+    M -- verify vs holdout --> V[resemblyzer]
+```
+
+Load-bearing decisions, each verifiable in `tests/test_studio.py`:
+
+- **One job at a time.** The engine is one model on one GPU serving one local user; a second `POST /api/jobs` while one runs returns **409**. The UI also disables Generate client-side.
+- **SSE, not WebSockets or polling.** Progress is strictly server→client; `EventSource` reconnects for free. Events append to a per-job list guarded by a `Condition`, so a consumer can replay from any cursor and follow live — the terminal `done`/`error` event cannot be lost to a drained queue.
+- **The engine's `progress` callback** (added for this layer, backward-compatible) feeds the stream; the CLI's stderr prints are untouched.
+- **State on disk, not in the server.** Every generation lands in `MYNA_HOME/studio/jobs/<id>/out.wav` plus one JSON line in `history.jsonl` (voice, params, seed, similarity, verdict, timings). Restart the server and history survives; corrupt trailing lines are skipped, not fatal.
+- **Loopback bind plus a same-origin guard.** No auth exists, so `cli.py` hardcodes `host="127.0.0.1"` — but loopback alone stops remote networks, not the user's own browser (any page could POST cross-origin, or reach us via a rebound DNS name). A red team caught this (red-team.md C2); the fix is a `local_origin_guard` middleware that rejects non-loopback `Host` headers and cross-origin `Origin` headers, the pattern Jupyter and Ollama use. Audio ids are minted hex and rejected unless alphanumeric (no path traversal); scripts are capped at 20k chars; enroll uploads are capped (24 files / 200 MB, streamed) and refuse to silently overwrite an existing voice (409 unless `overwrite=true`).
+- **Verification is part of the product loop.** After synthesis the job scores the output against the voice's held-out clip (falling back to the reference, and saying which) and the verdict chip renders in the UI — the same falsifiability-per-run promise the CLI makes, now visible.
+
+**Measured through the interface** (2026-07-11, M5 Pro, MPS, this repo): a 219-char script typed into the browser produced 12.62 s of audio in 18.3 s wall (warm model) and scored **0.921 — strong match vs holdout**; the same seeded take reproduced byte-identically across two fresh server sessions (seed 7, 1,211,600-byte wav both times), while a third run inside an already-warm process differed at the sample level (MPS kernels are not strictly deterministic) yet scored the same 0.921 — so treat `seed` as take-level reproducibility across launches, not a bit-exactness guarantee. The owner's real enrolled voice, run through the same UI on their own script, scored **0.885 vs holdout** (audio kept local, per guardrail). The demo video ([demo/myna-studio-demo.mp4](../demo/myna-studio-demo.mp4)) is a recording of the real interface, and the audio it ends on is the take generated during that recording.
+
+Known limits, honestly: single-process, single-user by design; no job cancellation (kill the server); no ASR/content check on outputs (inherited from §8 — the upgrade path stands); SSE drops don't kill a job (state is polled/replayed from `/api/jobs/{id}`) but the UI tells you to check History rather than pretending nothing happened. Every claim in this section survived a dedicated second-round red team; its findings and the code fixes are in [red-team.md](red-team.md).
