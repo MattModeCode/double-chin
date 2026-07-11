@@ -77,7 +77,7 @@ recap.html       the five-minute tour of everything in this repo
 ## Tests
 
 ```bash
-pytest -m "not slow" -q       # 28 unit tests, offline, ~1 s
+pytest -m "not slow" -q       # 30 unit tests, offline, ~1 s
 MYNA_E2E=1 pytest -m slow -q  # real script-to-audio run (loads the model)
 ```
 
