@@ -104,6 +104,9 @@ Recorded from runs in this repo on 2026-07-11 (M5 Pro, 48 GB, macOS 25.5, Python
 | `pip install chatterbox-tts` on py3.12/arm64 | clean resolve (with `setuptools<81` pin) |
 | Model load (MPS, warm cache) | 7.2–9.1 s |
 | First-call synthesis, default voice | 4.44 s audio in 21.1 s wall (includes graph warm-up) |
+| Slow e2e test (`MYNA_E2E=1 pytest -m slow`) | 1 passed in 17.1 s — asserts cloned-script similarity > 0.75 |
+| Clone vs held-out enrolment clip (not the conditioning clip) | 0.929 — strong match on audio the model never saw |
+| Mirror-test clones vs held-out *real* recordings of the same 3 sentences | 0.843 / 0.855 / 0.912 — all strong match |
 | Clone synthesis vs 16.7 s stand-in reference (novel sentence) | 6.96 s audio in 33.5 s wall (speed 0.21× realtime, first call) |
 | **Speaker similarity, cloned sentence vs reference (resemblyzer GE2E cosine)** | **0.902** — strong match (same-speaker threshold ≥0.75, strong ≥0.80) |
 | **Speaker similarity, full 39.4 s demo script vs reference** | **0.954** — strong match (4 chunks via `myna say --script`) |
