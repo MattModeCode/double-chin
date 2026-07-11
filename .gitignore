@@ -4,3 +4,6 @@ __pycache__/
 .pytest_cache/
 myna_out.wav
 .DS_Store
+
+# Personal voice recordings — biometric data, never commit to the public repo
+*.m4a
