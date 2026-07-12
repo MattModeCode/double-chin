@@ -1,4 +1,4 @@
-"""Pure-stdlib script chunking for Myna.
+"""Pure-stdlib script chunking for ChinAI.
 
 Splits a script into small, speakable chunks: paragraphs become sentence
 groups merged up to a character budget, and any sentence that still exceeds

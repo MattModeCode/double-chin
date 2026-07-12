@@ -1,4 +1,4 @@
-"""The Myna Studio application server.
+"""The ChinAI application server.
 
 A FastAPI app serving a JSON API plus the single-page frontend in
 `static/`. Binds to loopback only (see cli.py): Studio is a personal,
@@ -19,14 +19,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from urllib.parse import urlsplit
 
-from myna import __version__
-from myna.engine import (
+from chinai import __version__
+from chinai.engine import (
     DEFAULT_CFG_WEIGHT,
     DEFAULT_EXAGGERATION,
     DEFAULT_TEMPERATURE,
 )
-from myna.studio import history
-from myna.studio.jobs import JobBusyError, JobManager, JobNotFoundError
+from chinai.studio import history
+from chinai.studio.jobs import JobBusyError, JobManager, JobNotFoundError
 
 _STATIC_DIR = Path(__file__).parent / "static"
 _SSE_KEEPALIVE_SECONDS = 15.0
@@ -54,19 +54,19 @@ class JobRequest(BaseModel):
 
 
 def _default_engine_factory():
-    from myna.engine import MynaEngine
+    from chinai.engine import ChinaiEngine
 
-    return MynaEngine()
+    return ChinaiEngine()
 
 
 def _default_verify_fn(wav_a, wav_b) -> float:
-    from myna.verify import similarity
+    from chinai.verify import similarity
 
     return similarity(wav_a, wav_b)
 
 
 def _default_verdict_fn(score: float) -> str:
-    from myna.verify import verdict
+    from chinai.verify import verdict
 
     return verdict(score)
 
@@ -77,7 +77,7 @@ def create_app(
     verdict_fn=_default_verdict_fn,
 ) -> FastAPI:
     """Build the Studio app. Tests inject a fake engine via `engine_factory`."""
-    app = FastAPI(title="Myna Studio", version=__version__)
+    app = FastAPI(title="ChinAI", version=__version__)
     manager = JobManager(
         engine_factory=engine_factory or _default_engine_factory,
         verify_fn=verify_fn,
@@ -111,7 +111,7 @@ def create_app(
 
     @app.get("/api/voices")
     def get_voices():
-        from myna.voices import list_voices
+        from chinai.voices import list_voices
 
         return [
             {
@@ -129,8 +129,8 @@ def create_app(
         files: list[UploadFile] = File(...),
         overwrite: bool = Form(False),
     ):
-        from myna.config import voices_dir
-        from myna.voices import enroll
+        from chinai.config import voices_dir
+        from chinai.voices import enroll
 
         if len(files) > _MAX_ENROLL_FILES:
             raise HTTPException(
@@ -145,7 +145,7 @@ def create_app(
                 detail=f"voice '{name}' already exists; resend with overwrite=true to replace it.",
             )
 
-        with tempfile.TemporaryDirectory(prefix="myna-enroll-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="chinai-enroll-") as tmp:
             saved: list[Path] = []
             total_bytes = 0
             for index, upload in enumerate(files):
@@ -175,7 +175,7 @@ def create_app(
 
     @app.post("/api/jobs", status_code=202)
     def create_job(request: JobRequest):
-        from myna.voices import get_voice
+        from chinai.voices import get_voice
 
         try:
             voice = get_voice(request.voice)
@@ -252,17 +252,17 @@ def create_app(
         path = history.audio_path(job_id)
         if not path.is_file():
             raise HTTPException(status_code=404, detail=f"no audio for job {job_id}")
-        filename = f"myna-{job_id}.wav" if download else None
+        filename = f"chinai-{job_id}.wav" if download else None
         return FileResponse(path, media_type="audio/wav", filename=filename)
 
     @app.get("/api/doctor")
     def get_doctor():
-        from myna.config import myna_home
-        from myna.voices import list_voices
+        from chinai.config import chinai_home
+        from chinai.voices import list_voices
 
         report: dict = {
             "version": __version__,
-            "myna_home": str(myna_home()),
+            "chinai_home": str(chinai_home()),
             "voices": len(list_voices()),
         }
         try:

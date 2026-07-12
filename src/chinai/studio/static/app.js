@@ -1,4 +1,4 @@
-/* Myna Studio frontend. Plain JS, no build step, no external requests. */
+/* ChinAI frontend. Plain JS, no build step, no external requests. */
 "use strict";
 
 const $ = (id) => document.getElementById(id);
@@ -68,7 +68,7 @@ async function refreshDoctor() {
     const device = doctor.device ? doctor.device.toUpperCase() : "no torch";
     const weights = doctor.weights_cached ? "weights cached" : "first run downloads weights";
     $("env").innerHTML = `<b>${device}</b> · ${weights}`;
-    $("version").textContent = `myna ${doctor.version}`;
+    $("version").textContent = `chinai ${doctor.version}`;
   } catch (_) {
     $("env").textContent = "";
   }

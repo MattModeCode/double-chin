@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "myna"
+name = "chinai"
 version = "0.1.0"
-description = "Local voice-cloning CLI built on Chatterbox TTS"
+description = "ChinAI: a local, standalone voice-cloning app for your own voice"
 requires-python = ">=3.11,<3.13"
 dependencies = [
     "chatterbox-tts",
@@ -14,10 +14,11 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "python-multipart",
+    "pywebview",
 ]
 
 [project.scripts]
-myna = "myna.cli:main"
+chinai = "chinai.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest"]
@@ -25,8 +26,8 @@ dev = ["pytest"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "slow: marks tests that require the real Chatterbox model or network access; run with MYNA_E2E=1",
+    "slow: marks tests that require the real Chatterbox model or network access; run with CHINAI_E2E=1",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/myna"]
+packages = ["src/chinai"]

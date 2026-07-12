@@ -1,4 +1,4 @@
-"""Background synthesis jobs for Myna Studio.
+"""Background synthesis jobs for ChinAI.
 
 One job at a time: the engine is a single shared model on one GPU, and
 Studio serves a single local user. Submitting while a job runs raises
@@ -16,8 +16,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from myna.studio import history
-from myna.voices import VoiceInfo
+from chinai.studio import history
+from chinai.voices import VoiceInfo
 
 TERMINAL_EVENT_KINDS = frozenset({"done", "error"})
 _TEXT_PREVIEW_CHARS = 120
