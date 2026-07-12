@@ -35,8 +35,8 @@ Format: **Q** (the question) / **A** (the call) / **Why** (the reasoning and evi
 
 ### D6 — Product name
 **Q:** What is this software called?
-**A:** **Myna** — CLI `myna`, package `myna`. Tagline: "Your voice, on script."
-**Why:** The myna is the bird that learns to speak in a human's voice — exact metaphor for the product, one breath to say, four letters to type, no obvious collision in the local/personal-tool space. Runner-ups considered: Doppel (generic, taken by several apps), Lyrebird (taken by Descript's ancestor), EchoTwin (clunky). Local-only software, so trademark exposure is nil (guardrail 2: publish nothing).
+**A:** **ChinAI** — CLI `chinai`, package `chinai`. Tagline: "Your voice, on script."
+**Why:** The chinai is the bird that learns to speak in a human's voice — exact metaphor for the product, one breath to say, four letters to type, no obvious collision in the local/personal-tool space. Runner-ups considered: Doppel (generic, taken by several apps), Lyrebird (taken by Descript's ancestor), EchoTwin (clunky). Local-only software, so trademark exposure is nil (guardrail 2: publish nothing).
 
 ### D8 — Verification stack
 **Q:** SpeechBrain ECAPA-TDNN or resemblyzer for the "does the clone match" score?
@@ -62,12 +62,12 @@ Format: **Q** (the question) / **A** (the call) / **Why** (the reasoning and evi
 
 ### D12 — Application shape (tournament)
 **Q:** The CLI exists; the new mission demands one launchable application with a real interface. What shape?
-**A:** **Myna Studio** — a FastAPI backend + hand-built single-page frontend (vanilla HTML/CSS/JS, no build step), launched with `myna studio`, which starts a loopback-only server and opens the browser. Live chunk progress over SSE; one synthesis job at a time (HTTP 409 otherwise); history appended to a jsonl under `MYNA_HOME`.
+**A:** **ChinAI** — a FastAPI backend + hand-built single-page frontend (vanilla HTML/CSS/JS, no build step), launched with `chinai studio`, which starts a loopback-only server and opens the browser. Live chunk progress over SSE; one synthesis job at a time (HTTP 409 otherwise); history appended to a jsonl under `CHINAI_HOME`.
 **Why:** Three independent architect agents pitched competing shapes (FastAPI+SPA, Gradio 6, pywebview desktop shell); an independent judge scored them on product feel, launch robustness, progress UX, offline testability, autonomous-build risk, and brandability. FastAPI+SPA won 845/1000 vs 705 (pywebview) and 580 (Gradio). Deciding facts: the demo video must be recorded by driving the real interface in Chrome — impossible against a WKWebView native window — and Gradio's component chrome can't carry a bespoke brand. Salvaged from the losers: jsonl history (Gradio pitch) and the explicit 127.0.0.1-only bind as a stated security property (pywebview pitch). Conditions honoured from the judge: sentinel-terminated SSE stream and the 409 concurrent-job guard.
 
 ### D13 — Engine progress surface
 **Q:** The app needs live per-chunk progress, but the engine only printed progress to stderr. Scrape stderr or change the engine?
-**A:** Added an optional `progress(index, total, text)` callback parameter to `MynaEngine.synthesize` — backward compatible, covered by two new offline tests against a fake model (suite now 32 passing).
+**A:** Added an optional `progress(index, total, text)` callback parameter to `ChinaiEngine.synthesize` — backward compatible, covered by two new offline tests against a fake model (suite now 32 passing).
 **Why:** A real callback is testable and race-free; stderr scraping (what the Gradio pitch had to invent) is fragile and couples the UI to log formatting. The stderr print stays for CLI users.
 
 ### D14 — The owner's private content stays out of the repo
@@ -82,7 +82,7 @@ Format: **Q** (the question) / **A** (the call) / **Why** (the reasoning and evi
 
 ### D16 — Privacy re-record of the demo video
 **Q:** Frame-by-frame review of the first demo cut caught the owner's personal message run ("Hi my love…", voice `me`) visible in the app's History panel. Ship it, blur it, or re-record?
-**A:** Re-record the whole session against an isolated `MYNA_HOME` containing only the licence-free stand-in voice, so no personal content can appear in any committed pixel.
+**A:** Re-record the whole session against an isolated `CHINAI_HOME` containing only the licence-free stand-in voice, so no personal content can appear in any committed pixel.
 **Why:** Guardrail 2. Blurring is fragile and admits the leak into git history; a clean-room re-record is cheap (the take is seeded, so the audio is byte-identical: same 1,211,600-byte wav, same 0.921 score) and structurally safe. This is also why watching your own videos is a real step, not a checkbox.
 
 ### D17 — Whose audio plays in the demo
