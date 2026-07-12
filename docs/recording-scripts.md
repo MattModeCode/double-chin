@@ -1,6 +1,6 @@
-# Recording kit: clone your voice with Myna
+# Recording kit: clone your voice with ChinAI
 
-Fifteen minutes from now, Myna can speak in your voice.
+Fifteen minutes from now, ChinAI can speak in your voice.
 
 ## What you need
 
@@ -11,16 +11,16 @@ Fifteen minutes from now, Myna can speak in your voice.
 ## Room and mic setup
 
 1. **Sit ~20cm from the mic ("two fists" from your mouth to the device).** Consistent distance keeps loudness and tone even across every file.
-2. **Record in a quiet, soft-furnished room, or a closet full of clothes.** Hard, empty rooms produce reverb, and Myna clones the room along with your voice.
+2. **Record in a quiet, soft-furnished room, or a closet full of clothes.** Hard, empty rooms produce reverb, and ChinAI clones the room along with your voice.
 3. **No music, no other speakers, no background noise.** Anything audible in the reference becomes part of the clone.
 4. **Turn off noise gates, compressors, and noise-reduction/AI enhancement.** These processors distort the natural pace and inflection the clone needs to learn.
 5. **Aim for peaks around -6 to -3 dB (avoid clipping/red on the meter).** Too quiet loses detail; too loud distorts.
 6. **Use a wired mic or a phone's built-in mic — not AirPods-style earbuds.** Bluetooth earbuds compress audio and apply noise suppression, which corrupts the reference.
-7. **Deliver every line at the pace and register you want the clone to use.** Myna clones your pacing and inflection exactly as recorded — a rushed take produces a rushed clone.
+7. **Deliver every line at the pace and register you want the clone to use.** ChinAI clones your pacing and inflection exactly as recorded — a rushed take produces a rushed clone.
 
 ## The scripts
 
-Read naturally, at conversational pace, in the voice register you want Myna to reproduce. Re-record any line where you stumble, cough, or get interrupted — don't try to fix it by talking around it.
+Read naturally, at conversational pace, in the voice register you want ChinAI to reproduce. Re-record any line where you stumble, cough, or get interrupted — don't try to fix it by talking around it.
 
 ### Part A — Rainbow Passage (Take 1)
 
@@ -47,7 +47,7 @@ Read each sentence below as its own file, **or** all 12 continuously in one file
 11. The boy was there when the sun rose.
 12. A rod is used to catch pink salmon.
 
-That's roughly 1–2 minutes of speech across 13 files (or 2 files) — enough for Myna to pick the best 10–15 second window and hold out the rest for verification.
+That's roughly 1–2 minutes of speech across 13 files (or 2 files) — enough for ChinAI to pick the best 10–15 second window and hold out the rest for verification.
 
 ## Recording settings
 
@@ -57,7 +57,7 @@ That's roughly 1–2 minutes of speech across 13 files (or 2 files) — enough f
 
 **Any other recorder app:** match these settings as closely as possible — mono, 16- or 24-bit, 44.1kHz or 48kHz sample rate, no compression/limiter/noise-reduction effects enabled.
 
-File format doesn't matter — .m4a, .wav, .mp3, and .flac all work. Myna converts automatically on enrolment.
+File format doesn't matter — .m4a, .wav, .mp3, and .flac all work. ChinAI converts automatically on enrolment.
 
 ## Self-check before enrolling
 
@@ -76,16 +76,16 @@ If any file fails a check, re-record just that one — don't re-record everythin
 Put all your recordings in one folder, then run:
 
 ```bash
-myna enroll me ~/Desktop/my-voice/
+chinai enroll me ~/Desktop/my-voice/
 ```
 
 Test it immediately:
 
 ```bash
-myna say "This is my voice clone speaking." --voice me -o test.wav --verify
+chinai say "This is my voice clone speaking." --voice me -o test.wav --verify
 ```
 
-`--verify` prints a similarity score comparing the generated audio to a held-out clip from your recordings (when you enrolled two or more files, Myna reserves the last one for exactly this check — it is never part of the reference the model imitates). The score measures who the output sounds like, not what was said, so still listen to your first take:
+`--verify` prints a similarity score comparing the generated audio to a held-out clip from your recordings (when you enrolled two or more files, ChinAI reserves the last one for exactly this check — it is never part of the reference the model imitates). The score measures who the output sounds like, not what was said, so still listen to your first take:
 
 - **≥ 0.75** — good match, you're done
 - **0.60–0.75** — usable but marginal; a re-recording of the noisiest file will likely improve it
@@ -96,10 +96,10 @@ myna say "This is my voice clone speaking." --voice me -o test.wav --verify
 | Symptom | Cause | Fix |
 |---|---|---|
 | Robotic or muffled | Mic too far away, or room too noisy/reverberant | Re-record closer to the mic (two fists), in a quieter, softer room |
-| Wrong pace (too fast/slow, wrong energy) | Myna clones the exact pace and register you recorded | Re-record at the pace and register you actually want the clone to use |
+| Wrong pace (too fast/slow, wrong energy) | ChinAI clones the exact pace and register you recorded | Re-record at the pace and register you actually want the clone to use |
 | Echoey or hollow | Hard-surfaced room | Move to a softer room or a closet full of clothes |
 | Verification score < 0.60 | Reference audio is noisy or inconsistent | Re-record the flagged file(s) following the room/mic rules above |
 
 ## Licence note
 
-The Rainbow Passage (Fairbanks, 1960) is in the public domain. The Harvard Sentences (IEEE, 1969) are de facto public domain and freely republished for speech-testing purposes. Both are reproduced here in full for personal use with Myna.
+The Rainbow Passage (Fairbanks, 1960) is in the public domain. The Harvard Sentences (IEEE, 1969) are de facto public domain and freely republished for speech-testing purposes. Both are reproduced here in full for personal use with ChinAI.

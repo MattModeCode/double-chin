@@ -1,6 +1,6 @@
-# Myna — technical design
+# ChinAI — technical design
 
-Local voice cloning: hand Myna a script and a few seconds of a person's voice, get the script read aloud in that voice. Inference runs on-device; your audio and enrolled voices never leave the machine. (The engine's weights download once from Hugging Face, and the hub is re-contacted on cold loads unless `HF_HUB_OFFLINE=1` — that is the entire network surface; there is no telemetry.)
+Local voice cloning: hand ChinAI a script and a few seconds of a person's voice, get the script read aloud in that voice. Inference runs on-device; your audio and enrolled voices never leave the machine. (The engine's weights download once from Hugging Face, and the hub is re-contacted on cold loads unless `HF_HUB_OFFLINE=1` — that is the entire network surface; there is no telemetry.)
 
 This document records the approach tournament, the winning architecture, and the evidence behind every load-bearing claim. Decisions are cross-referenced to [build-log.md](build-log.md) (D-numbers). Claims are cited to live URLs or to test results reproducible in this repo.
 
@@ -50,9 +50,9 @@ Consequences that shape the whole product:
 
 The mission demands proof, not vibes. The argument has four legs:
 
-1. **Mechanism.** Zero-shot conditioning never trains on the target speaker, so there is no "will it learn my voice" risk class. The only variable is reference-clip quality, which the recording kit controls and `myna enroll` validates (duration floor, format normalization).
+1. **Mechanism.** Zero-shot conditioning never trains on the target speaker, so there is no "will it learn my voice" risk class. The only variable is reference-clip quality, which the recording kit controls and `chinai enroll` validates (duration floor, format normalization).
 2. **Measured evidence on a stand-in speaker.** A 16.7 s reference of CMU Arctic speaker `bdl` was cloned reading a novel sentence; a separate speaker-verification model (resemblyzer GE2E, [Apache 2.0](https://github.com/resemble-ai/Resemblyzer) — different weights but the same vendor and embedding family as the engine's conditioning, so "separate", not "independent") scored clone-vs-reference cosine similarity at **0.902** for the single sentence and **0.954** for the full 39 s demo script — above the ≥0.75 community same-speaker threshold ([evaluation](https://ceur-ws.org/Vol-4164/paper7.pdf)). Negative controls bound the claim: a *different* real speaker scores 0.672–0.713 on the same metric, so the wrong-speaker floor for same-register English narration is ~0.7, and scores must be read against that floor, not against zero. Full numbers in §7; regenerate any time with the e2e test.
-3. **Falsifiability per run.** `myna say --verify` scores every output against the enrolled reference and prints a verdict. If a clone ever drifts, the user sees a number, not a shrug.
+3. **Falsifiability per run.** `chinai say --verify` scores every output against the enrolled reference and prints a verdict. If a clone ever drifts, the user sees a number, not a shrug.
 4. **Honest limits.** Zero-shot cloning reproduces timbre and prosodic register; it does not reproduce idiosyncratic disfluencies, code-switching habits, or emotional range outside the reference's register. Exaggeration/CFG knobs partially compensate (§6). These limits are restated in the red-team report ([red-team.md](red-team.md)).
 
 ## 5. Architecture
@@ -60,7 +60,7 @@ The mission demands proof, not vibes. The argument has four legs:
 ```mermaid
 flowchart LR
     subgraph enrolment
-        R[recordings<br/>wav/m4a/mp3/flac] --> E[voices.enroll<br/>mono - 24 kHz - normalize - concat] --> V[(~/.myna/voices/name/<br/>reference.wav + meta.json)]
+        R[recordings<br/>wav/m4a/mp3/flac] --> E[voices.enroll<br/>mono - 24 kHz - normalize - concat] --> V[(~/.chinai/voices/name/<br/>reference.wav + meta.json)]
     end
     subgraph synthesis
         S[script.txt] --> C[chunk.split_script<br/>sentence-aware, max 280 chars]
@@ -79,20 +79,20 @@ Module inventory (src layout, `pip install -e .`):
 
 | Module | Job | Heavy deps |
 |---|---|---|
-| `myna/chunk.py` | sentence-aware script splitting with per-chunk pause metadata | none (stdlib) |
-| `myna/voices.py` | enrolment: load→mono→24 kHz→normalize→concat→validate→store | torchaudio (lazy) |
-| `myna/engine.py` | device pick (mps>cuda>cpu), model load once, conditionals once per voice, per-chunk generation, pause stitching, synthesis report | chatterbox-tts (lazy) |
-| `myna/verify.py` | GE2E cosine similarity + RMS silence gate + verdict bands | resemblyzer (lazy) |
-| `myna/cli.py` | `enroll · say · voices · verify · doctor` | none at import |
-| `myna/config.py` | `MYNA_HOME` (default `~/.myna`), constants | none |
+| `chinai/chunk.py` | sentence-aware script splitting with per-chunk pause metadata | none (stdlib) |
+| `chinai/voices.py` | enrolment: load→mono→24 kHz→normalize→concat→validate→store | torchaudio (lazy) |
+| `chinai/engine.py` | device pick (mps>cuda>cpu), model load once, conditionals once per voice, per-chunk generation, pause stitching, synthesis report | chatterbox-tts (lazy) |
+| `chinai/verify.py` | GE2E cosine similarity + RMS silence gate + verdict bands | resemblyzer (lazy) |
+| `chinai/cli.py` | `enroll · say · voices · verify · doctor` | none at import |
+| `chinai/config.py` | `CHINAI_HOME` (default `~/.chinai`), constants | none |
 
-Design rules: heavy imports are lazy so `myna --help` and unit tests run instantly offline; the model loads once per process and conditionals are prepared once per voice, so an N-chunk script pays the conditioning cost once; all state lives under `MYNA_HOME` (env-overridable, trivially testable).
+Design rules: heavy imports are lazy so `chinai --help` and unit tests run instantly offline; the model loads once per process and conditionals are prepared once per voice, so an N-chunk script pays the conditioning cost once; all state lives under `CHINAI_HOME` (env-overridable, trivially testable).
 
 ## 6. Latency/quality tradeoffs
 
 - **Chunking at 280 chars.** Chatterbox degrades on very long single generations (autoregressive drift; community guidance keeps utterances short). Sentence-aware chunks with 0.35 s intra-paragraph / 0.7 s paragraph pauses read naturally and bound both latency-to-first-audio and failure blast radius.
 - **Knobs surfaced, defaults sane.** `exaggeration` (emotion intensity, default 0.5), `cfg_weight` (reference adherence vs. liveliness, default 0.5), `temperature` (default 0.8) pass straight through to the engine ([API](https://github.com/resemble-ai/chatterbox)); `--seed` gives reproducible takes.
-- **Speed.** MPS on the M5 Pro: model load 7–9 s; measured synthesis speed ≈ 0.21× realtime on first calls (§7) — a 60 s narration costs roughly five minutes of wall time. The CLI prints this same convention ("speed 0.21x realtime"). CPU fallback works but is several times slower; `myna doctor` reports which device you'll get. If sustained throughput ever matters more than simplicity, the MLX route (same weights) is the documented upgrade path.
+- **Speed.** MPS on the M5 Pro: model load 7–9 s; measured synthesis speed ≈ 0.21× realtime on first calls (§7) — a 60 s narration costs roughly five minutes of wall time. The CLI prints this same convention ("speed 0.21x realtime"). CPU fallback works but is several times slower; `chinai doctor` reports which device you'll get. If sustained throughput ever matters more than simplicity, the MLX route (same weights) is the documented upgrade path.
 - **Determinism.** Same seed + same inputs → the same take across fresh launches (measured byte-identical twice in §10); reruns inside a warm process can drift at the sample level on MPS without changing how the take sounds or scores. Without a seed, takes vary like human takes do — a feature for narration work (re-roll a flat line).
 
 ## 7. Measured results (this machine)
@@ -104,22 +104,22 @@ Recorded from runs in this repo on 2026-07-11 (M5 Pro, 48 GB, macOS 25.5, Python
 | `pip install chatterbox-tts` on py3.12/arm64 | clean resolve (with `setuptools<81` pin) |
 | Model load (MPS, warm cache) | 7.2–9.1 s |
 | First-call synthesis, default voice | 4.44 s audio in 21.1 s wall (includes graph warm-up) |
-| Slow e2e test (`MYNA_E2E=1 pytest -m slow`) | 1 passed in 17.1 s — asserts cloned-script similarity > 0.75 |
+| Slow e2e test (`CHINAI_E2E=1 pytest -m slow`) | 1 passed in 17.1 s — asserts cloned-script similarity > 0.75 |
 | Clone vs held-out enrolment clip (not the conditioning clip) | 0.929 — strong match on audio the model never saw |
 | Mirror-test clones vs held-out *real* recordings of the same 3 sentences | 0.843 / 0.855 / 0.912 — all strong match |
 | Clone synthesis vs 16.7 s stand-in reference (novel sentence) | 6.96 s audio in 33.5 s wall (speed 0.21× realtime, first call) |
 | **Speaker similarity, cloned sentence vs reference (resemblyzer GE2E cosine)** | **0.902** — strong match (same-speaker threshold ≥0.75, strong ≥0.80) |
-| **Speaker similarity, full 39.4 s demo script vs reference** | **0.954** — strong match (4 chunks via `myna say --script`) |
+| **Speaker similarity, full 39.4 s demo script vs reference** | **0.954** — strong match (4 chunks via `chinai say --script`) |
 | Negative control: clone vs a *different* real speaker (VOiCES sp0307) | 0.713 — below the 0.75 match line |
 | Negative control: two different real speakers | 0.672 — below the 0.75 match line |
 
-Read the scores against the measured wrong-speaker floor (~0.67–0.71 for same-register English narration), not against zero: the verdict bands' `<0.60` "no match" tier is rarely reachable for clean speech, and `--verify` measures *speaker identity only* — not intelligibility or whether the right words were said (no ASR pass exists; that is the documented upgrade path). The end-to-end test (`MYNA_E2E=1 pytest -m slow`) regenerates a script-to-audio run and asserts similarity > 0.75 on any machine.
+Read the scores against the measured wrong-speaker floor (~0.67–0.71 for same-register English narration), not against zero: the verdict bands' `<0.60` "no match" tier is rarely reachable for clean speech, and `--verify` measures *speaker identity only* — not intelligibility or whether the right words were said (no ASR pass exists; that is the documented upgrade path). The end-to-end test (`CHINAI_E2E=1 pytest -m slow`) regenerates a script-to-audio run and asserts similarity > 0.75 on any machine.
 
 ## 8. Risks and mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Dependency drift (`setuptools`≥81 removing `pkg_resources` breaks perth + webrtcvad) | hard pin in `pyproject.toml`; `myna doctor` checks importability |
+| Dependency drift (`setuptools`≥81 removing `pkg_resources` breaks perth + webrtcvad) | hard pin in `pyproject.toml`; `chinai doctor` checks importability |
 | MPS regressions in future torch | device auto-fallback to CPU; `--device` override |
 | Long scripts drift or run out of memory | chunking bounds each generation; constant memory per chunk |
 | Reference clip quality sabotages the clone | enrolment validates duration/format; `--verify` scores every output; recording kit prevents the classic failures |
@@ -140,17 +140,17 @@ Read the scores against the measured wrong-speaker floor (~0.67–0.71 for same-
 
 Nothing in the stack restricts personal local use; F5-TTS's NC weights were avoided anyway by picking Chatterbox.
 
-## 10. The application layer: Myna Studio
+## 10. The application layer: ChinAI
 
-The second mission ([application-prompt.md](../application-prompt.md), 2026-07-11) asked for the pipeline wrapped in one launchable application. The shape was decided by a three-way architecture tournament (FastAPI+SPA vs Gradio 6 vs pywebview desktop shell) scored by an independent judge — 845/1000 for FastAPI+SPA; full scoring and rationale in [build-log.md D12](build-log.md). `myna studio` starts a FastAPI server on `127.0.0.1:8787` and opens the browser on a hand-built single-page UI (vanilla HTML/CSS/JS, no build step, no external requests — fonts ship with the package).
+The second mission ([application-prompt.md](../application-prompt.md), 2026-07-11) asked for the pipeline wrapped in one launchable application. The shape was decided by a three-way architecture tournament (FastAPI+SPA vs Gradio 6 vs pywebview desktop shell) scored by an independent judge — 845/1000 for FastAPI+SPA; full scoring and rationale in [build-log.md D12](build-log.md). `chinai studio` starts a FastAPI server on `127.0.0.1:8787` and opens the browser on a hand-built single-page UI (vanilla HTML/CSS/JS, no build step, no external requests — fonts ship with the package).
 
 ```mermaid
 flowchart LR
     B[browser SPA<br/>static/] -- "POST /api/jobs" --> A[FastAPI app]
     A -- 202 job_id --> B
     A --> M[JobManager<br/>one worker thread]
-    M -- progress callback --> E[MynaEngine<br/>loaded once, MPS]
-    M -- append --> H[(MYNA_HOME/studio/<br/>jobs/id/out.wav + history.jsonl)]
+    M -- progress callback --> E[ChinaiEngine<br/>loaded once, MPS]
+    M -- append --> H[(CHINAI_HOME/studio/<br/>jobs/id/out.wav + history.jsonl)]
     B -- "SSE /api/jobs/id/events" --> A
     M -- verify vs holdout --> V[resemblyzer]
 ```
@@ -160,10 +160,10 @@ Load-bearing decisions, each verifiable in `tests/test_studio.py`:
 - **One job at a time.** The engine is one model on one GPU serving one local user; a second `POST /api/jobs` while one runs returns **409**. The UI also disables Generate client-side.
 - **SSE, not WebSockets or polling.** Progress is strictly server→client; `EventSource` reconnects for free. Events append to a per-job list guarded by a `Condition`, so a consumer can replay from any cursor and follow live — the terminal `done`/`error` event cannot be lost to a drained queue.
 - **The engine's `progress` callback** (added for this layer, backward-compatible) feeds the stream; the CLI's stderr prints are untouched.
-- **State on disk, not in the server.** Every generation lands in `MYNA_HOME/studio/jobs/<id>/out.wav` plus one JSON line in `history.jsonl` (voice, params, seed, similarity, verdict, timings). Restart the server and history survives; corrupt trailing lines are skipped, not fatal.
+- **State on disk, not in the server.** Every generation lands in `CHINAI_HOME/studio/jobs/<id>/out.wav` plus one JSON line in `history.jsonl` (voice, params, seed, similarity, verdict, timings). Restart the server and history survives; corrupt trailing lines are skipped, not fatal.
 - **Loopback bind plus a same-origin guard.** No auth exists, so `cli.py` hardcodes `host="127.0.0.1"` — but loopback alone stops remote networks, not the user's own browser (any page could POST cross-origin, or reach us via a rebound DNS name). A red team caught this (red-team.md C2); the fix is a `local_origin_guard` middleware that rejects non-loopback `Host` headers and cross-origin `Origin` headers, the pattern Jupyter and Ollama use. Audio ids are minted hex and rejected unless alphanumeric (no path traversal); scripts are capped at 20k chars; enroll uploads are capped (24 files / 200 MB, streamed) and refuse to silently overwrite an existing voice (409 unless `overwrite=true`).
 - **Verification is part of the product loop.** After synthesis the job scores the output against the voice's held-out clip (falling back to the reference, and saying which) and the verdict chip renders in the UI — the same falsifiability-per-run promise the CLI makes, now visible.
 
-**Measured through the interface** (2026-07-11, M5 Pro, MPS, this repo): a 219-char script typed into the browser produced 12.62 s of audio in 18.3 s wall (warm model) and scored **0.921 — strong match vs holdout**; the same seeded take reproduced byte-identically across two fresh server sessions (seed 7, 1,211,600-byte wav both times), while a third run inside an already-warm process differed at the sample level (MPS kernels are not strictly deterministic) yet scored the same 0.921 — so treat `seed` as take-level reproducibility across launches, not a bit-exactness guarantee. The owner's real enrolled voice, run through the same UI on their own script, scored **0.885 vs holdout** (audio kept local, per guardrail). The demo video ([demo/myna-studio-demo.mp4](../demo/myna-studio-demo.mp4)) is a recording of the real interface, and the audio it ends on is the take generated during that recording.
+**Measured through the interface** (2026-07-11, M5 Pro, MPS, this repo): a 219-char script typed into the browser produced 12.62 s of audio in 18.3 s wall (warm model) and scored **0.921 — strong match vs holdout**; the same seeded take reproduced byte-identically across two fresh server sessions (seed 7, 1,211,600-byte wav both times), while a third run inside an already-warm process differed at the sample level (MPS kernels are not strictly deterministic) yet scored the same 0.921 — so treat `seed` as take-level reproducibility across launches, not a bit-exactness guarantee. The owner's real enrolled voice, run through the same UI on their own script, scored **0.885 vs holdout** (audio kept local, per guardrail). The demo video ([demo/chinai-studio-demo.mp4](../demo/chinai-studio-demo.mp4)) is a recording of the real interface, and the audio it ends on is the take generated during that recording.
 
 Known limits, honestly: single-process, single-user by design; no job cancellation (kill the server); no ASR/content check on outputs (inherited from §8 — the upgrade path stands); SSE drops don't kill a job (state is polled/replayed from `/api/jobs/{id}`) but the UI tells you to check History rather than pretending nothing happened. Every claim in this section survived a dedicated second-round red team; its findings and the code fixes are in [red-team.md](red-team.md).
