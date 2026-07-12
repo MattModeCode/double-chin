@@ -2,8 +2,12 @@
 __pycache__/
 *.egg-info/
 .pytest_cache/
-myna_out.wav
+chinai_out.wav
 .DS_Store
+
+# PyInstaller build output — rebuildable, and contains files over GitHub's 100MB limit
+build/
+dist/
 
 # Personal voice recordings — biometric data, never commit to the public repo
 *.m4a
