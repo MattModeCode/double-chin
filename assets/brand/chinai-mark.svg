@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Myna logo: a symmetric waveform on a dark rounded square">
-  <!-- Myna mark: a waveform that is its own mirror. Two tones, one glyph. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="ChinAI logo: a symmetric waveform on a dark rounded square">
+  <!-- ChinAI mark: a waveform that is its own mirror. Two tones, one glyph. -->
   <rect x="0" y="0" width="256" height="256" rx="46" fill="#0f0e13"/>
   <g fill="#e1e0e0">
     <rect x="34.5"  y="105.6" width="23" height="44.8"  rx="11.5"/>
