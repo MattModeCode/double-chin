@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+chinai_out.wav
+.DS_Store
+
+# PyInstaller build output — rebuildable, and contains files over GitHub's 100MB limit
+build/
+dist/
+
+# Personal voice recordings — biometric data, never commit to the public repo
+*.m4a
+
+# Personal scripts the owner feeds the app — private content, never commit
+voice clone scripts/

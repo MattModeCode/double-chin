@@ -1,0 +1,8 @@
+file 'w1.wav'
+file 'w2.wav'
+file 'w3.wav'
+file 'w4.wav'
+file 'w5.wav'
+file 'w6.wav'
+file 'w7.wav'
+file 'w8.wav'

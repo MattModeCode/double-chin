@@ -1,0 +1,8 @@
+w1: Welcome to Myna. Everything you are about to hear, including this narration, was generated on a laptop by the software being described. That is the point.
+w2: Myna is a command line tool that clones a voice from a few seconds of audio. You enrol a voice once, then hand Myna any script, and it reads that script in the enrolled voice. It runs entirely on your machine.
+w3: Under the hood, Myna conditions a pretrained speech model on your reference clip. There is no training step. Enrolment simply prepares your best fifteen seconds of audio, and the model does the rest at generation time.
+w4: When you ask Myna to speak, it splits your script into sentence sized chunks, conditions the model once, generates each chunk on the Apple GPU, and stitches the audio together with natural pauses.
+w5: To clone your own voice, you read two short public domain scripts into any recorder. About two minutes of clean audio in a quiet room. The recording kit walks you through every step.
+w6: Every output can be verified. An independent speaker model compares the clone against the reference and prints a similarity score. This narration was verified against its reference before it shipped.
+w7: Myna is honest about its limits. It mirrors timbre and pace, not your vocabulary or your improvisation. And it refuses to pretend. If a clone drifts, the verifier will tell you.
+w8: The code is in the repo. The models are on the disk. The voice is yours. Myna. Your voice, on script.
