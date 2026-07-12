@@ -1,10 +1,10 @@
-"""Unit tests for myna.cli."""
+"""Unit tests for chinai.cli."""
 
 from __future__ import annotations
 
 import pytest
 
-from myna.cli import main
+from chinai.cli import main
 
 
 def test_help_exits_zero():
@@ -26,7 +26,7 @@ def test_no_command_exits_two():
 
 
 def test_voices_on_empty_home_prints_hint(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("MYNA_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "home"))
     exit_code = main(["voices"])
     assert exit_code == 0
     captured = capsys.readouterr()
@@ -34,12 +34,12 @@ def test_voices_on_empty_home_prints_hint(tmp_path, monkeypatch, capsys):
 
 
 def test_doctor_runs_offline_and_exits_zero(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("MYNA_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "home"))
     exit_code = main(["doctor"])
     assert exit_code == 0
     captured = capsys.readouterr()
     assert "python:" in captured.out
-    assert "myna home:" in captured.out
+    assert "chinai home:" in captured.out
 
 
 def test_verify_missing_file_exits_two(tmp_path, capsys):
@@ -47,4 +47,4 @@ def test_verify_missing_file_exits_two(tmp_path, capsys):
     exit_code = main(["verify", str(missing), str(missing)])
     assert exit_code == 2
     captured = capsys.readouterr()
-    assert "myna: error:" in captured.err
+    assert "chinai: error:" in captured.err

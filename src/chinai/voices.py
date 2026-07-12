@@ -1,4 +1,4 @@
-"""Voice enrollment and lookup for Myna."""
+"""Voice enrollment and lookup for ChinAI."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from myna.config import (
+from chinai.config import (
     MAX_REFERENCE_SECONDS,
     MIN_REFERENCE_SECONDS,
     SAMPLE_RATE,
@@ -155,7 +155,7 @@ def enroll(name: str, sources: list[Path]) -> VoiceInfo:
     (in the same deterministic order used to build the reference) still
     totals at least MIN_REFERENCE_SECONDS on its own, the last file is
     reserved as a held-out clip (voices/<name>/holdout.wav) and excluded
-    from reference.wav, so `myna say --verify` can score against audio the
+    from reference.wav, so `chinai say --verify` can score against audio the
     model was never conditioned on.
 
     Raises:

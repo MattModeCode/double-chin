@@ -1,4 +1,4 @@
-"""Command-line interface for Myna."""
+"""Command-line interface for ChinAI."""
 
 from __future__ import annotations
 
@@ -7,17 +7,22 @@ import shutil
 import sys
 from pathlib import Path
 
-from myna import __version__
-from myna.config import myna_home
-from myna.engine import DEFAULT_CFG_WEIGHT, DEFAULT_EXAGGERATION, DEFAULT_TEMPERATURE
+from chinai import __version__
+from chinai.config import chinai_home, migrate_legacy_home
+from chinai.engine import DEFAULT_CFG_WEIGHT, DEFAULT_EXAGGERATION, DEFAULT_TEMPERATURE
+
+# Commands that actually touch chinai_home(); migration only needs to run
+# ahead of these, so `chinai verify` (arbitrary wav files, no storage) and
+# argparse-level exits (--help, unknown/missing command) never trigger it.
+_STORAGE_COMMANDS = frozenset({"enroll", "say", "voices", "doctor", "studio", "app"})
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="myna",
+        prog="chinai",
         description="Local voice-cloning CLI powered by Chatterbox TTS.",
     )
-    parser.add_argument("--version", action="version", version=f"myna {__version__}")
+    parser.add_argument("--version", action="version", version=f"chinai {__version__}")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -40,8 +45,8 @@ def build_parser() -> argparse.ArgumentParser:
     voice_group.add_argument("--voice", help="Name of an enrolled voice.")
     voice_group.add_argument("--ref", type=Path, help="Path to a reference wav file.")
     say_parser.add_argument(
-        "-o", "--out", type=Path, default=Path("myna_out.wav"),
-        help="Output wav path (default: ./myna_out.wav).",
+        "-o", "--out", type=Path, default=Path("chinai_out.wav"),
+        help="Output wav path (default: ./chinai_out.wav).",
     )
     say_parser.add_argument(
         "--verify", action="store_true",
@@ -64,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("doctor", help="Report environment diagnostics.")
 
     studio_parser = subparsers.add_parser(
-        "studio", help="Launch Myna Studio, the local web application."
+        "studio", help="Launch ChinAI, the local web application."
     )
     studio_parser.add_argument(
         "--port", type=int, default=8787, help="Port to serve on (default: 8787)."
@@ -74,11 +79,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Don't open the browser automatically.",
     )
 
+    subparsers.add_parser(
+        "app", help="Launch ChinAI as a native desktop window (no browser tab)."
+    )
+
     return parser
 
 
 def _cmd_enroll(args: argparse.Namespace) -> int:
-    from myna.voices import enroll
+    from chinai.voices import enroll
 
     info = enroll(args.name, args.sources)
     print(f"Enrolled voice '{info.name}': {info.duration_seconds:.1f}s reference audio.")
@@ -87,9 +96,9 @@ def _cmd_enroll(args: argparse.Namespace) -> int:
 
 
 def _cmd_say(args: argparse.Namespace) -> int:
-    from myna.engine import MynaEngine
-    from myna.verify import similarity, verdict
-    from myna.voices import get_voice
+    from chinai.engine import ChinaiEngine
+    from chinai.verify import similarity, verdict
+    from chinai.voices import get_voice
 
     if args.script:
         if not args.script.is_file():
@@ -106,7 +115,7 @@ def _cmd_say(args: argparse.Namespace) -> int:
         if not reference_wav.is_file():
             raise ValueError(f"reference wav not found: {reference_wav}")
 
-    engine = MynaEngine(device=args.device)
+    engine = ChinaiEngine(device=args.device)
     report = engine.synthesize(
         script=script_text,
         reference_wav=reference_wav,
@@ -140,11 +149,11 @@ def _cmd_say(args: argparse.Namespace) -> int:
 
 
 def _cmd_voices(args: argparse.Namespace) -> int:
-    from myna.voices import list_voices
+    from chinai.voices import list_voices
 
     voices = list_voices()
     if not voices:
-        print("No voices enrolled yet. Use 'myna enroll NAME SOURCE...' to add one.")
+        print("No voices enrolled yet. Use 'chinai enroll NAME SOURCE...' to add one.")
         return 0
 
     name_width = max(len("name"), *(len(v.name) for v in voices))
@@ -155,7 +164,7 @@ def _cmd_voices(args: argparse.Namespace) -> int:
 
 
 def _cmd_verify(args: argparse.Namespace) -> int:
-    from myna.verify import similarity, verdict
+    from chinai.verify import similarity, verdict
 
     if not args.ref.is_file():
         raise ValueError(f"reference wav not found: {args.ref}")
@@ -205,7 +214,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 
         print("PASS resemblyzer: importable")
     except ImportError:
-        print("WARN resemblyzer: not installed; 'myna verify' will fail")
+        print("WARN resemblyzer: not installed; 'chinai verify' will fail")
 
     hf_cache = Path.home() / ".cache" / "huggingface"
     chatterbox_dirs = [p for p in hf_cache.rglob("*chatterbox*") if p.is_dir()] if hf_cache.is_dir() else []
@@ -220,8 +229,8 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     else:
         print("WARN ffmpeg not found on PATH.")
 
-    home = myna_home()
-    print(f"PASS myna home: {home}")
+    home = chinai_home()
+    print(f"PASS chinai home: {home}")
 
     disk_check_path = home if home.exists() else Path.home()
     usage = shutil.disk_usage(disk_check_path)
@@ -237,10 +246,10 @@ def _cmd_studio(args: argparse.Namespace) -> int:
 
     import uvicorn
 
-    from myna.studio.app import create_app
+    from chinai.studio.app import create_app
 
     url = f"http://127.0.0.1:{args.port}"
-    print(f"Myna Studio: {url}  (Ctrl-C to stop)")
+    print(f"ChinAI: {url}  (Ctrl-C to stop)")
 
     if not args.no_browser:
         # Give uvicorn a moment to bind before the browser asks for the page.
@@ -252,6 +261,12 @@ def _cmd_studio(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_app(args: argparse.Namespace) -> int:
+    from chinai import desktop
+
+    return desktop.run()
+
+
 _HANDLERS = {
     "enroll": _cmd_enroll,
     "say": _cmd_say,
@@ -259,6 +274,7 @@ _HANDLERS = {
     "verify": _cmd_verify,
     "doctor": _cmd_doctor,
     "studio": _cmd_studio,
+    "app": _cmd_app,
 }
 
 
@@ -266,15 +282,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    if args.command in _STORAGE_COMMANDS:
+        migrated = migrate_legacy_home()
+        if migrated:
+            print(f"chinai: migrated existing voice data to {migrated}", file=sys.stderr)
+
     try:
         return _HANDLERS[args.command](args)
     except KeyboardInterrupt:
         return 130
     except ValueError as exc:
-        print(f"myna: error: {exc}", file=sys.stderr)
+        print(f"chinai: error: {exc}", file=sys.stderr)
         return 2
     except Exception as exc:  # torch/audio backends raise their own types
-        print(f"myna: error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(f"chinai: error: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
 
 

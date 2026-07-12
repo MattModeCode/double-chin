@@ -1,4 +1,4 @@
-"""Voice-cloned speech synthesis engine for Myna."""
+"""Voice-cloned speech synthesis engine for ChinAI."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from myna.chunk import DEFAULT_MAX_CHARS, split_script
+from chinai.chunk import DEFAULT_MAX_CHARS, split_script
 
 DEFAULT_EXAGGERATION = 0.5
 DEFAULT_CFG_WEIGHT = 0.5
@@ -45,7 +45,7 @@ def _pick_device(requested: str | None) -> str:
     return "cpu"
 
 
-class MynaEngine:
+class ChinaiEngine:
     """Wraps a lazily-loaded ChatterboxTTS model for voice-cloned synthesis."""
 
     def __init__(self, device: str | None = None) -> None:

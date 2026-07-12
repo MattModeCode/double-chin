@@ -1,4 +1,4 @@
-"""Speaker-similarity verification for Myna, using Resemblyzer embeddings."""
+"""Speaker-similarity verification for ChinAI, using Resemblyzer embeddings."""
 
 from __future__ import annotations
 

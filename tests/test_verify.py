@@ -1,4 +1,4 @@
-"""Unit tests for myna.verify.
+"""Unit tests for chinai.verify.
 
 These tests exercise verdict() banding and the RMS silence gate only; they
 must not trigger a Resemblyzer model load (lazy-imported only on the
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from myna.verify import (
+from chinai.verify import (
     BORDERLINE_THRESHOLD,
     MATCH_THRESHOLD,
     STRONG_MATCH_THRESHOLD,

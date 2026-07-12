@@ -1,8 +1,8 @@
-"""Generation history persistence for Myna Studio.
+"""Generation history persistence for ChinAI.
 
 Every completed generation appends one JSON object to
-`MYNA_HOME/studio/history.jsonl`; the audio itself lives in
-`MYNA_HOME/studio/jobs/<job_id>/out.wav`. Append-only, newest last on
+`CHINAI_HOME/studio/history.jsonl`; the audio itself lives in
+`CHINAI_HOME/studio/jobs/<job_id>/out.wav`. Append-only, newest last on
 disk, returned newest first.
 """
 
@@ -12,12 +12,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from myna.config import ensure_dir, myna_home
+from chinai.config import ensure_dir, chinai_home
 
 
 def studio_dir() -> Path:
-    """Return the Studio state directory under the Myna home."""
-    return myna_home() / "studio"
+    """Return the Studio state directory under the ChinAI home."""
+    return chinai_home() / "studio"
 
 
 def jobs_dir() -> Path:
