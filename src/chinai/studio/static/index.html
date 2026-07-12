@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChinAI</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f0e13'/%3E%3Cg fill='%23e1e0e0'%3E%3Crect x='14' y='38' width='5' height='10' rx='2.5'/%3E%3Crect x='23' y='29' width='5' height='19' rx='2.5'/%3E%3Crect x='32' y='16' width='5' height='32' rx='2.5'/%3E%3Crect x='41' y='29' width='5' height='19' rx='2.5'/%3E%3Crect x='50' y='38' width='5' height='10' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+    <div>
+      <div class="name">ChinAI</div>
+      <div class="sub">your voice, on script</div>
+    </div>
+  </div>
+  <div class="env" id="env" aria-live="polite"></div>
+</header>
+
+<main>
+  <section class="panel compose" aria-labelledby="compose-h">
+    <h2 id="compose-h">Script</h2>
+
+    <div class="field">
+      <label for="voice">Voice</label>
+      <div class="voice-row">
+        <select id="voice" aria-describedby="voice-hint"></select>
+        <button type="button" class="ghost" id="enroll-toggle" aria-expanded="false">+ enroll</button>
+      </div>
+      <div class="hint" id="voice-hint"></div>
+    </div>
+
+    <form id="enroll-form" class="enroll" hidden>
+      <div class="field">
+        <label for="enroll-name">New voice name</label>
+        <input id="enroll-name" name="name" type="text" pattern="[a-z0-9_\-]{1,40}"
+               placeholder="lowercase letters, digits, - _" required>
+      </div>
+      <div class="field">
+        <label for="enroll-files">Recordings (wav / m4a / mp3 / flac — two or more clips
+          enable held-out verification)</label>
+        <input id="enroll-files" name="files" type="file" multiple
+               accept=".wav,.m4a,.mp3,.flac" required>
+      </div>
+      <div class="row-end">
+        <button type="submit" class="ghost" id="enroll-btn">Enroll voice</button>
+      </div>
+      <div class="hint" id="enroll-status" role="status"></div>
+    </form>
+
+    <div class="field">
+      <label for="script">Text to speak</label>
+      <textarea id="script" rows="9" spellcheck="false"
+        placeholder="Paste or type the script. Blank lines become paragraph pauses."></textarea>
+      <div class="meta-row">
+        <span class="hint" id="script-stats">0 chars</span>
+        <label class="file-load ghost-link" for="script-file">load from file…</label>
+        <input type="file" id="script-file" accept=".txt,.md" hidden>
+      </div>
+    </div>
+
+    <details class="knobs">
+      <summary>Delivery controls</summary>
+      <div class="knob">
+        <label for="exaggeration">Exaggeration <output id="exaggeration-val">0.5</output></label>
+        <input type="range" id="exaggeration" min="0" max="1" step="0.05" value="0.5">
+        <div class="hint">emotion intensity — 0 flat, 1 theatrical</div>
+      </div>
+      <div class="knob">
+        <label for="cfg">Reference adherence <output id="cfg-val">0.5</output></label>
+        <input type="range" id="cfg" min="0" max="1" step="0.05" value="0.5">
+        <div class="hint">higher sticks closer to the reference delivery</div>
+      </div>
+      <div class="knob">
+        <label for="temperature">Temperature <output id="temperature-val">0.8</output></label>
+        <input type="range" id="temperature" min="0.05" max="2" step="0.05" value="0.8">
+        <div class="hint">variation between takes</div>
+      </div>
+      <div class="knob seed">
+        <label for="seed">Seed</label>
+        <input type="number" id="seed" placeholder="random" min="0" step="1">
+        <div class="hint">set a number to make the take reproducible</div>
+      </div>
+    </details>
+
+    <button type="button" class="primary" id="generate">Generate</button>
+    <div class="hint eta" id="eta"></div>
+  </section>
+
+  <section class="panel output" aria-labelledby="output-h">
+    <h2 id="output-h">Output</h2>
+
+    <div id="idle-state" class="empty">
+      <p>Pick a voice, paste a script, hit <b>Generate</b>.</p>
+      <p class="hint">First generation loads the model (~10 s on Apple GPU); synthesis runs
+      at roughly one fifth of realtime, chunk by chunk — you'll see each one land below.</p>
+    </div>
+
+    <div id="job-state" hidden>
+      <div class="job-head">
+        <span id="job-status" class="status" aria-live="polite">queued</span>
+        <span id="job-timer" class="hint"></span>
+      </div>
+      <div class="bar" aria-hidden="true"><div id="bar-fill"></div></div>
+      <ol id="chunk-list" class="chunks" aria-label="chunk progress"></ol>
+      <div id="job-error" class="error" role="alert" hidden></div>
+    </div>
+
+    <div id="result" class="result" hidden>
+      <div class="result-head">
+        <span class="chip" id="verdict-chip"></span>
+        <span class="hint" id="result-meta"></span>
+      </div>
+      <audio id="player" controls></audio>
+      <div class="row-end">
+        <a id="download" class="ghost-link" download>download wav</a>
+      </div>
+    </div>
+
+    <h2 class="history-h">History</h2>
+    <div id="history" class="history" aria-live="polite"></div>
+  </section>
+</main>
+
+<footer>
+  <span>local only · nothing leaves this machine (weights download once from Hugging Face)</span>
+  <span id="version"></span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

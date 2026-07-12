@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "chinai"
+version = "0.1.0"
+description = "ChinAI: a local, standalone voice-cloning app for your own voice"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "chatterbox-tts",
+    "resemblyzer",
+    "setuptools<81",
+    "fastapi",
+    "uvicorn",
+    "python-multipart",
+    "pywebview",
+]
+
+[project.scripts]
+chinai = "chinai.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests that require the real Chatterbox model or network access; run with CHINAI_E2E=1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chinai"]
