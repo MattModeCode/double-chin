@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Myna — recap</title>
+<title>ChinAI — recap</title>
 <style>
   @font-face{
     font-family:"JetBrains Mono";font-weight:400;font-style:normal;font-display:swap;
@@ -113,9 +113,9 @@
   <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
   <div class="eyebrow">Local voice-cloning application · built end-to-end by an autonomous agent · 2026-07-11</div>
   <h1>Give it a script. It reads it back in your voice.</h1>
-  <p class="lede">Myna clones a voice from a few seconds of audio and speaks any text in it —
+  <p class="lede">ChinAI clones a voice from a few seconds of audio and speaks any text in it —
   <strong class="tag">entirely on your laptop</strong>, no cloud, no account, no audio leaving the machine.
-  One command, <code>myna studio</code>, launches the whole pipeline as an application in your browser.
+  One command, <code>chinai studio</code>, launches the whole pipeline as an application in your browser.
   This page is the five-minute tour: see the app, hear it, read how it works, and see where two adversarial reviews pushed back.</p>
 
   <div class="stats">
@@ -128,13 +128,13 @@
 
 <section id="app">
   <span class="eyebrow">The application</span>
-  <h2>Myna Studio: one command, whole pipeline</h2>
-  <p><code>myna studio</code> starts a loopback-only server and opens the app: pick or enroll a voice,
+  <h2>ChinAI: one command, whole pipeline</h2>
+  <p><code>chinai studio</code> starts a loopback-only server and opens the app: pick or enroll a voice,
   paste a script, tune delivery, and Generate. Synthesis progress streams live — each chunk lands as
   the Apple GPU finishes it — then the take auto-plays with its <strong>speaker-similarity verdict</strong>
   and joins a replayable history. Below: the app right after a verified generation, exactly as recorded
   in the demo video.</p>
-  <p><a href="demo/studio/05-done.png"><img src="demo/studio/05-done.png" alt="Myna Studio after a verified generation: chunk list, 0.921 strong-match verdict, audio player, history"
+  <p><a href="demo/studio/05-done.png"><img src="demo/studio/05-done.png" alt="ChinAI after a verified generation: chunk list, 0.921 strong-match verdict, audio player, history"
     style="width:100%;border-radius:8px;border:1px solid rgba(226,232,240,.09)"></a></p>
   <p class="muted" style="font-size:13px">Architecture (FastAPI + hand-built single page, SSE progress, one-job-at-a-time), the
   three-way shape tournament, and the measured numbers: <a href="docs/design.md">docs/design.md §10</a>.</p>
@@ -143,19 +143,19 @@
 <section id="hear">
   <span class="eyebrow">The proof you can hear</span>
   <h2>Reference in, clone out</h2>
-  <p>Left is the real reference voice Myna was given — a licence-free stand-in speaker. (The owner's own voice
+  <p>Left is the real reference voice ChinAI was given — a licence-free stand-in speaker. (The owner's own voice
   is enrolled and scored 0.885 vs its held-out clip through the app, but their audio stays off this repo by design.)
-  Right is Myna reading a script it had never seen, generated on this machine. Same person?
+  Right is ChinAI reading a script it had never seen, generated on this machine. Same person?
   Judge for yourself, then <a href="demo/mirror-test.html">take the blind mirror test →</a></p>
   <div class="ab">
     <div class="card">
       <h3>Reference <span class="chip real">real · 16.7 s</span></h3>
-      <div class="sub">The audio handed to Myna. Nothing here was generated.</div>
+      <div class="sub">The audio handed to ChinAI. Nothing here was generated.</div>
       <audio controls preload="none" src="demo/assets/standin_reference.wav"></audio>
     </div>
     <div class="card">
-      <h3>Clone <span class="chip ok">myna · 0.954</span></h3>
-      <div class="sub">Myna reading <a href="demo/demo-script.txt">demo-script.txt</a>, a script it was never conditioned on.</div>
+      <h3>Clone <span class="chip ok">chinai · 0.954</span></h3>
+      <div class="sub">ChinAI reading <a href="demo/demo-script.txt">demo-script.txt</a>, a script it was never conditioned on.</div>
       <audio controls preload="none" src="demo/demo-clone.wav"></audio>
     </div>
   </div>
@@ -169,22 +169,22 @@
   (from the CLI era) explains how cloning works, narrated by the clone.</p>
   <div class="videos">
     <div>
-      <video controls preload="metadata" src="demo/myna-studio-demo.mp4"></video>
+      <video controls preload="metadata" src="demo/chinai-studio-demo.mp4"></video>
       <div class="vcap">Studio demo — 69 s. Typed script → live chunks → verified 0.921 → the take plays.</div>
     </div>
     <div>
-      <video controls preload="metadata" src="demo/myna-walkthrough.mp4" poster="demo/video/slides/w1.png"></video>
+      <video controls preload="metadata" src="demo/chinai-walkthrough.mp4" poster="demo/video/slides/w1.png"></video>
       <div class="vcap">Walkthrough — 91 s. How it works, self-narrated, verified 0.948.</div>
     </div>
   </div>
   <p class="muted" style="font-size:13px;margin-top:14px">Also kept: the original CLI demo,
-  <a href="demo/myna-demo.mp4">demo/myna-demo.mp4</a> (65 s, verified 0.954).</p>
+  <a href="demo/chinai-demo.mp4">demo/chinai-demo.mp4</a> (65 s, verified 0.954).</p>
 </section>
 
 <section id="how">
   <span class="eyebrow">How it works</span>
   <h2>Zero-shot conditioning, not training</h2>
-  <p>Myna never trains on your voice. It uses <strong>Chatterbox TTS</strong> (MIT-licensed, 0.5B parameters),
+  <p>ChinAI never trains on your voice. It uses <strong>Chatterbox TTS</strong> (MIT-licensed, 0.5B parameters),
   which conditions on the first ~10 seconds of your reference clip and generates speech in that voice.
   Enrolment just assembles your best reference audio — instant, reversible, no GPU-hours. That's why the whole
   pipeline could be built and proven before the owner records a single word: it's speaker-agnostic by construction.</p>
@@ -209,11 +209,11 @@ uv pip install <span class="p">--python</span> .venv/bin/python <span class="p">
 source .venv/bin/activate
 
 <span class="c"># enroll the shipped stand-in voice, then launch the application</span>
-myna enroll standin demo/assets/arctic_000*.wav demo/assets/ref_a.wav
-myna studio          <span class="c"># opens http://127.0.0.1:8787 — script in, voice out</span>
+chinai enroll standin demo/assets/arctic_000*.wav demo/assets/ref_a.wav
+chinai studio          <span class="c"># opens http://127.0.0.1:8787 — script in, voice out</span>
 
 <span class="c"># the same pipeline, scriptable</span>
-myna say <span class="p">--script</span> your-script.txt <span class="p">--voice</span> standin <span class="p">-o</span> out.wav <span class="p">--verify</span></pre>
+chinai say <span class="p">--script</span> your-script.txt <span class="p">--voice</span> standin <span class="p">-o</span> out.wav <span class="p">--verify</span></pre>
   <p class="muted" style="font-size:13px;margin-top:14px">Setup, the application, CLI reference, and the recording kit: <a href="README.md">README.md</a> ·
   <a href="docs/recording-scripts.md">docs/recording-scripts.md</a>. 51 offline tests pass in ~2 s.</p>
 </section>
@@ -249,14 +249,14 @@ myna say <span class="p">--script</span> your-script.txt <span class="p">--voice
     <a class="tile" href="docs/recording-scripts.md"><div class="t">Recording kit <span class="ext">.md</span></div><div class="d">The 15-minute script to clone your own voice.</div></a>
     <a class="tile" href="docs/red-team.md"><div class="t">Red-team report <span class="ext">.md</span></div><div class="d">Nine adversarial findings and their fixes.</div></a>
     <a class="tile" href="docs/build-log.md"><div class="t">Build log <span class="ext">.md</span></div><div class="d">Every autonomous decision, with the reasoning.</div></a>
-    <a class="tile" href="src/myna/studio/"><div class="t">The application <span class="ext">src/myna/studio/</span></div><div class="d">FastAPI server · jobs · SSE · history · branded SPA. Launch: <code>myna studio</code>.</div></a>
-    <a class="tile" href="demo/myna-studio-demo.mp4"><div class="t">Studio demo video <span class="ext">.mp4</span></div><div class="d">A real session through the interface, verified 0.921.</div></a>
+    <a class="tile" href="src/chinai/studio/"><div class="t">The application <span class="ext">src/chinai/studio/</span></div><div class="d">FastAPI server · jobs · SSE · history · branded SPA. Launch: <code>chinai studio</code>.</div></a>
+    <a class="tile" href="demo/chinai-studio-demo.mp4"><div class="t">Studio demo video <span class="ext">.mp4</span></div><div class="d">A real session through the interface, verified 0.921.</div></a>
     <a class="tile" href="demo/studio/"><div class="t">App screenshots <span class="ext">demo/studio/</span></div><div class="d">Idle → filled → progress → verified, plus the take itself.</div></a>
     <a class="tile" href="demo/voice-passport-standin.html"><div class="t">Voice passport <span class="ext">.html</span></div><div class="d">Provenance card for a cloned voice: sources, holdout, score, watermark.</div></a>
-    <a class="tile" href="src/myna/"><div class="t">Source <span class="ext">src/</span></div><div class="d">cli · engine · chunk · voices · verify · config.</div></a>
+    <a class="tile" href="src/chinai/"><div class="t">Source <span class="ext">src/</span></div><div class="d">cli · engine · chunk · voices · verify · config.</div></a>
     <a class="tile" href="tests/"><div class="t">Tests <span class="ext">tests/</span></div><div class="d">51 offline tests + a slow end-to-end run.</div></a>
-    <a class="tile" href="demo/myna-demo.mp4"><div class="t">CLI demo video <span class="ext">.mp4</span></div><div class="d">Script in, cloned audio out, verified.</div></a>
-    <a class="tile" href="demo/myna-walkthrough.mp4"><div class="t">Walkthrough video <span class="ext">.mp4</span></div><div class="d">Self-narrated explainer, 91 s.</div></a>
+    <a class="tile" href="demo/chinai-demo.mp4"><div class="t">CLI demo video <span class="ext">.mp4</span></div><div class="d">Script in, cloned audio out, verified.</div></a>
+    <a class="tile" href="demo/chinai-walkthrough.mp4"><div class="t">Walkthrough video <span class="ext">.mp4</span></div><div class="d">Self-narrated explainer, 91 s.</div></a>
     <a class="tile" href="demo/mirror-test.html"><div class="t">Mirror test <span class="ext">.html</span></div><div class="d">Blind quiz: real vs clone, six clips.</div></a>
     <a class="tile" href="demo/demo-clone.wav"><div class="t">Cloned audio <span class="ext">.wav</span></div><div class="d">The 39 s demo script, generated locally.</div></a>
     <a class="tile" href="demo/video/metrics.json"><div class="t">Metrics <span class="ext">.json</span></div><div class="d">Measured similarity scores, seeded and reproducible.</div></a>
@@ -264,7 +264,7 @@ myna say <span class="p">--script</span> your-script.txt <span class="p">--voice
 </section>
 
 <footer>
-  <p>Myna · your voice, on script. Built locally on an Apple M5 Pro with Chatterbox TTS (MIT) and resemblyzer (Apache-2.0).
+  <p>ChinAI · your voice, on script. Built locally on an Apple M5 Pro with Chatterbox TTS (MIT) and resemblyzer (Apache-2.0).
   Stand-in voice from the CMU Arctic corpus (free licence). Nothing here was published to the internet.</p>
   <p style="margin-top:8px">Start with the <a class="lead-link" href="README.md">README</a> or
   <a class="lead-link" href="demo/mirror-test.html">the mirror test</a>.</p>
