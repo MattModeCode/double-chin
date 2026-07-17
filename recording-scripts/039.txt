@@ -1,0 +1,4 @@
+To reset the router, hold the small button on the back for ten seconds.
+The lights will blink twice and then turn a steady green.
+Wait about two minutes for the network to come back online.
+If it does not, unplug the power and try once more.
