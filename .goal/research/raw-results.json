@@ -1,0 +1,531 @@
+{
+  "reports": [
+    {
+      "name": "RVC (Retrieval-based Voice Conversion WebUI)",
+      "family": "voice-conversion",
+      "license": "MIT (RVC-Project/Retrieval-based-Voice-Conversion-WebUI). Freely redistributable. Note: pretrained base models (HuBERT/ContentVec, RMVPE) carry their own upstream licenses but are permissively usable locally; no gated weights.",
+      "license_free_redistributable": true,
+      "cloning_fidelity": "8/10 \u2014 timbre match is excellent with 30-60 min clean data; top-1 retrieval (feature index) suppresses tone leakage. Ceiling is timbre only: prosody/cadence come from the DONOR performance you feed in, not from the model.",
+      "finetune_supported": true,
+      "finetune_apple_silicon": "yes",
+      "finetune_evidence": "Training runs on Apple Silicon via PyTorch MPS but is slow and historically CPU-heavy. Issue #767 reports an M1 MacBook Pro taking 6+ hours for a 30-min dataset with the user unsure the GPU was even engaged (https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI/issues/767). MPS support was an open 'help wanted' enhancement as of issue #136 (https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI/issues/136) and issue #575 (https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI/issues/575). No CUDA-only dependencies (no DeepSpeed/bitsandbytes/flash-attn/xformers in the training loop) \u2014 it is plain PyTorch + numpy, which is why it degrades to MPS/CPU rather than failing. Community macOS forks exist (NevilPatel01/RVC-WebUI-MacOS, qingbo1011/RVC-WebUI-MacOS) and a pure-MLX inference port (Acelogic/Retrieval-based-Voice-Conversion-MLX, ~8.71x faster inference than MPS) \u2014 but the MLX port accelerates INFERENCE, not training.",
+      "inference_apple_silicon": "mps \u2014 works on MPS with CPU fallback; MLX port gives ~8.7x faster inference. Real-time capable on M-series.",
+      "data_needed_minutes": "10 min minimum works; 30-60 min clean mono 44.1kHz gives near-indistinguishable timbre. More data mainly helps the retrieval index, not the decoder.",
+      "prosody_style_controls": "No native text-driven prosody. As a converter, cadence/emphasis/emotion are inherited from the source donor audio. Manual controls: pitch transpose (semitones), index/retrieval rate (0-1, timbre vs artifact tradeoff), median filter radius (breathiness), RMS volume-envelope mix, and F0 method (RMVPE/Crepe/FCPE). No pause/rate/style tokens.",
+      "latency_note": "Inference is fast/near-real-time on M-series (MPS or MLX). Training is the bottleneck: hours per model on Apple Silicon.",
+      "key_urls": [
+        "https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI",
+        "https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI/issues/767",
+        "https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI/issues/136",
+        "https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI/issues/575",
+        "https://github.com/Acelogic/Retrieval-based-Voice-Conversion-MLX",
+        "https://github.com/NevilPatel01/RVC-WebUI-MacOS",
+        "https://en.wikipedia.org/wiki/Retrieval-based_Voice_Conversion"
+      ],
+      "risks": [
+        "NOT a TTS \u2014 cannot 'type text and get the voice'. It converts an existing recording's timbre. For an indistinguishable blind test you must supply a donor performance (you or an actor speaking the lines), which the app then re-timbres. This may or may not fit the product goal.",
+        "Prosody realism is entirely bounded by the donor performance; the model adds none.",
+        "Training on Apple Silicon is functional but slow (hours) and GPU utilization has historically been poor/CPU-bound \u2014 long iteration cycles.",
+        "Best-known acceleration (MLX port) only covers inference, not training.",
+        "Pitch/formant mismatch between donor and target degrades similarity; works best when donor pitch range is close to target."
+      ],
+      "verdict": "Serious contender for local + free + Mac-trainable and delivers excellent timbre cloning \u2014 but it is a voice CONVERTER, not TTS: 'indistinguishable' only if you feed it a real donor performance, and Apple-Silicon training is slow."
+    },
+    {
+      "name": "so-vits-svc (SoftVC VITS Singing Voice Conversion)",
+      "family": "voice-conversion",
+      "license": "MIXED \u2014 original svc-develop-team/so-vits-svc is AGPL-3.0 AND archived read-only since Nov 2023, with non-commercial/academic and consent clauses ('academic purposes', fictional characters, must credit source vocals). The actively maintained fork voicepaw/so-vits-svc-fork is MIT-licensed and the practical choice.",
+      "license_free_redistributable": true,
+      "cloning_fidelity": "8/10 (fork, well-trained) \u2014 strong timbre/naturalness on both speech and singing; arguably better pitch handling than RVC for sung/expressive material. Same ceiling caveat: prosody comes from the source clip.",
+      "finetune_supported": true,
+      "finetune_apple_silicon": "yes",
+      "finetune_evidence": "Training confirmed working on Apple Silicon but very slow. Discussion #851 (M1 Pro): training proceeds only with PYTORCH_ENABLE_MPS_FALLBACK=1 because aten::_weight_norm_interface had no MPS kernel; ~15 min/epoch, projecting 2-3 weeks for 2000 epochs at 60-80% GPU util (https://github.com/voicepaw/so-vits-svc-fork/discussions/851). Issue #170 documents the MPS aten::_weight_norm NotImplementedError and the CPU-fallback workaround (https://github.com/svc-develop-team/so-vits-svc/issues/170). A PyTorch fix for the blocking op was merged into nightlies, reducing fallback need. Austin Yip trained a full voice clone on a Mac Studio (https://austinyip.medium.com/i-cloned-my-own-voice-to-create-an-ai-austin-yip-using-my-mac-studio-957e159de28d). No CUDA-only libs (no DeepSpeed/bitsandbytes/flash-attn) in the loop \u2014 plain PyTorch, so MPS/CPU works. Apple-Silicon fork: audiohacking/so-vits-svc-fork-osx.",
+      "inference_apple_silicon": "mps \u2014 works on MPS with CPU fallback; realtime fork exists. Some report inference issues on M1 requiring CPU (issue #687).",
+      "data_needed_minutes": "~30-60 min clean audio for near-indistinguishable results; clips sliced to 5-15s, 44.1kHz mono. Diffusion head (fork) improves detail with more data.",
+      "prosody_style_controls": "No text-driven prosody \u2014 converter, so cadence/emotion come from the source clip. Controls: pitch/transpose, F0 predictor (RMVPE/FCPE/Crepe/Dio), optional shallow-diffusion depth for timbre detail, cluster/feature-retrieval ratio for timbre-vs-clarity, and NSF-HiFiGAN vocoder. No pause/rate/emphasis tokens.",
+      "latency_note": "Inference near-real-time on M-series (fork has realtime mode). Training is the severe bottleneck on Apple Silicon: days-to-weeks for full convergence due to MPS fallback.",
+      "key_urls": [
+        "https://github.com/voicepaw/so-vits-svc-fork",
+        "https://github.com/voicepaw/so-vits-svc-fork/discussions/851",
+        "https://github.com/svc-develop-team/so-vits-svc",
+        "https://github.com/svc-develop-team/so-vits-svc/issues/170",
+        "https://github.com/voicepaw/so-vits-svc-fork/issues/687",
+        "https://github.com/audiohacking/so-vits-svc-fork-osx",
+        "https://austinyip.medium.com/i-cloned-my-own-voice-to-create-an-ai-austin-yip-using-my-mac-studio-957e159de28d"
+      ],
+      "risks": [
+        "NOT a TTS \u2014 same as RVC, it re-timbres a donor recording; you must supply the performance. Prosody realism is bounded by the source clip.",
+        "Original repo is AGPL-3.0 + archived + carries non-commercial/academic + consent language; only the MIT fork (voicepaw) is safe for redistributable/commercial local use \u2014 pin to the fork, not the archived upstream.",
+        "Apple-Silicon training is the slowest of the two: MPS-fallback on weight_norm meant ~15 min/epoch and 2-3 weeks to fully train on M1 Pro; verify current PyTorch has the merged MPS kernel to avoid this.",
+        "More moving parts than RVC (diffusion, multiple F0 predictors) \u2014 more tuning to get indistinguishable output.",
+        "Reports of inference needing CPU on some M1 setups (issue #687)."
+      ],
+      "verdict": "Viable local + free (via the MIT voicepaw fork) + Mac-trainable, with cloning quality on par with or better than RVC for expressive/sung audio \u2014 but Apple-Silicon training is the slowest here (MPS fallback, weeks), and like RVC it is a converter, not TTS."
+    },
+    {
+      "name": "XTTS-v2 (Coqui TTS)",
+      "family": "TTS",
+      "license": "Code MPL-2.0 (permissive); model weights Coqui Public Model License (CPML) 1.0 \u2014 NON-COMMERCIAL only. Coqui Inc. shut down Jan 2024, so no commercial license is purchasable. Fine for personal/local/non-commercial use; NOT freely redistributable for commercial products.",
+      "license_free_redistributable": false,
+      "cloning_fidelity": "8/10 \u2014 with fine-tuning on 30-60 min it is one of the strongest open cloners; excellent timbre match, but the GPT-2 autoregressive decoder occasionally drifts in pronunciation/prosody near the end of long paragraphs, capping true indistinguishability.",
+      "finetune_supported": true,
+      "finetune_apple_silicon": "yes",
+      "finetune_evidence": "Fine-tuning itself is first-class (official Gradio pipeline `xtts_demo.py` trains the GPT layer). Apple-Silicon reality is the catch: MPS is BROKEN for XTTS \u2014 coqui-ai/TTS issue #3649 is labelled bug+wontfix, model 'just hangs until Ctrl-C' on MPS (M1 Max), and the documented workaround is device=cpu which 'works just fine and rather quickly' for inference. A dedicated repo (DrewThomasson/finetuneXtts_apple_silicone) explicitly fine-tunes XTTS on an M1 Pro 16GB Mac \u2014 but its gpt_train.py contains no MPS device selection, so training falls back to CPU. Net: fine-tuning DOES run end-to-end on Apple Silicon, but on CPU (slow, hours-to-days), not GPU. No CUDA-only ops (DeepSpeed/bitsandbytes) are required for the base training path.",
+      "inference_apple_silicon": "cpu",
+      "latency_note": "CPU-only on Mac (MPS hangs); inference is usable but not real-time on longer text. Training on CPU is slow \u2014 plan for many hours for a good fine-tune.",
+      "data_needed_minutes": "30-60 min clean, single-speaker, 22kHz+; more helps consistency. Zero-shot works from ~6s but fine-tuning on 30-60 min is what pushes toward indistinguishable.",
+      "prosody_style_controls": "Reference-audio conditioning drives timbre + speaking style/emotion (no explicit emotion tags). Native decoding controls: temperature, length_penalty, repetition_penalty, top_k, top_p, and a speed factor. No fine-grained per-word pause/emphasis markup; prosody is implicit from the reference clip and punctuation.",
+      "key_urls": [
+        "https://github.com/coqui-ai/TTS/issues/3649",
+        "https://github.com/DrewThomasson/finetuneXtts_apple_silicone",
+        "https://docs.coqui.ai/en/latest/models/xtts.html",
+        "https://huggingface.co/coqui/XTTS-v2/blob/main/LICENSE.txt",
+        "https://github.com/coqui-ai/TTS/discussions/4304"
+      ],
+      "risks": [
+        "MPS is unsupported (wontfix) \u2014 both inference and training run on CPU, so it is slow on a Mac.",
+        "Weights are CPML non-commercial; only safe for a private/personal app, and no commercial upgrade path exists since Coqui folded.",
+        "Autoregressive drift on long sentences can break the blind-test illusion; keep synthesis to sentence/short-paragraph chunks.",
+        "Original coqui-ai/TTS repo is archived/unmaintained; rely on the community `coqui-tts` fork for current fixes."
+      ],
+      "verdict": "Serious contender: it is the one of the two that provably fine-tunes AND infers on Apple Silicon (via CPU, MPS broken) and hits high similarity \u2014 the trade-off is non-commercial weights and slow CPU-only speed."
+    },
+    {
+      "name": "F5-TTS",
+      "family": "TTS",
+      "license": "Code MIT (permissive); official pre-trained weights CC-BY-NC-4.0 (non-commercial, due to Emilia in-the-wild training data). An Apache-2.0 re-trained base exists (mrfakename/OpenF5-TTS-Base) for those needing commercial/redistributable weights.",
+      "license_free_redistributable": false,
+      "cloning_fidelity": "9/10 potential \u2014 flow-matching (DiT) gives best-in-class English naturalness and prosody on long inputs (reported zero-shot speaker similarity ~0.864, silences/cadence sound right); fine-tuning on 30-60 min raises similarity further. Fidelity ceiling is the highest of the two \u2014 IF you can train it.",
+      "finetune_supported": true,
+      "finetune_apple_silicon": "no",
+      "finetune_evidence": "This is where it fails the decisive gate. The training code is CUDA-focused: issue #150 ('Finetune on MPS support') documents that the codebase only checks `torch.cuda.is_available()` and lacks Apple-Silicon device logic; no maintainer or user confirms MPS fine-tuning actually works. MPS also can't do float64 ('Cannot convert a MPS Tensor to float64 \u2026 MPS doesn't support float64'), which the flow-matching training path can hit. Issues #875/#56 are open feature requests for MPS/CoreML/MLX, unanswered by maintainers. Community fine-tune guidance (discussion #769) assumes an NVIDIA GPU \u2014 ~320 epochs / ~20-25k steps \u2248 1 day on a 12GB RTX 4080 with bf16; CPU-only on a Mac would be impractically slow (days-plus). MLX ports (f5-tts-mlx, f5-tts-swift) exist but are inference-oriented, not a proven fine-tune path. Conclusion: no credible evidence of a working local fine-tune on Apple Silicon MPS or CPU.",
+      "inference_apple_silicon": "mps",
+      "latency_note": "Inference runs on MPS (pip `f5-tts` selects mps) and there are MLX/CoreML community ports for fast Apple-Silicon inference. Fine-tuning is the problem, not inference.",
+      "data_needed_minutes": "10-60 min clean per speaker; community reports significant quality gains after fine-tuning, but only after long GPU training runs (~hundreds of epochs).",
+      "prosody_style_controls": "Flow-matching, no duration model/phoneme alignment \u2014 prosody is implicit from the reference clip and punctuation. Native knobs: NFE steps, sway-sampling coefficient, speed, cross-fade duration, and reference-audio style transfer. No explicit emotion or per-word emphasis tags.",
+      "key_urls": [
+        "https://github.com/SWivid/F5-TTS/issues/150",
+        "https://github.com/SWivid/F5-TTS/issues/875",
+        "https://github.com/SWivid/F5-TTS/issues/56",
+        "https://github.com/SWivid/F5-TTS/discussions/769",
+        "https://huggingface.co/mrfakename/OpenF5-TTS-Base",
+        "https://github.com/SWivid/F5-TTS"
+      ],
+      "risks": [
+        "DISQUALIFYING for this project's hard constraint: no evidence local fine-tuning works on Apple Silicon \u2014 training loop is CUDA-oriented and hits MPS float64 limits; CPU fine-tune would be prohibitively slow.",
+        "Official weights are CC-BY-NC-4.0 (non-commercial); the Apache OpenF5 base is a separate, less-validated checkpoint.",
+        "MLX/CoreML ports cover inference only \u2014 do not assume they train.",
+        "Best used zero-shot or with a GPU elsewhere for fine-tuning, neither of which satisfies 'fine-tune locally on this Mac'."
+      ],
+      "verdict": "Highest fidelity ceiling of the two, but it FAILS the non-negotiable gate: no working local fine-tune on Apple Silicon (CUDA-focused trainer, MPS float64 limits, unanswered MPS requests) \u2014 inference-only on Mac, so disqualified for the train-on-this-Mac requirement."
+    },
+    {
+      "name": "Fish-Speech / OpenAudio S1 (S1-mini open weights)",
+      "family": "TTS",
+      "license": "Code Apache-2.0; open weights = OpenAudio S1-mini (0.5B) under CC-BY-NC-SA-4.0 (non-commercial, share-alike). Full S1 is closed/API-only. Not freely redistributable for commercial use.",
+      "license_free_redistributable": false,
+      "cloning_fidelity": "8/10 \u2014 trained on ~2M hrs, very strong zero-shot similarity/naturalness and a rich prosody markup; ceiling is high in principle, but real-world fine-tune reliability is shaky (documented gibberish 'awawawa' failures) which caps what you can dependably reach.",
+      "finetune_supported": true,
+      "finetune_apple_silicon": "no",
+      "finetune_evidence": "Official LoRA fine-tune (python fish_speech/train.py --config-name text2semantic_finetune) is documented but designed for CUDA GPUs; original AR training used 8xH100 for a week (https://arxiv.org/pdf/2411.01156). MPS support in the repo is INFERENCE-ONLY (PR #461 'Support inference on mps device natively', https://github.com/fishaudio/fish-speech/pull/461); macOS native deploy still 'coming soon'. No evidence of anyone fine-tuning on MPS/CPU. Fine-tune reliability itself is questioned: issue #1136 shows a correctly-formatted 211-clip run on an RTX 4090 producing pure gibberish, closed as 'not planned' (https://github.com/fishaudio/fish-speech/issues/1136). S1-mini fine-tune support was itself ambiguous (train.py present in v1.5.0, questioned in #1086, https://github.com/fishaudio/fish-speech/issues/1086). The training stack (PyTorch-Lightning, bf16, flash-attention-style attention) is CUDA-oriented; bitsandbytes/flash-attn have no macOS path.",
+      "inference_apple_silicon": "mps \u2014 native MPS inference merged (PR #461), but slow/impractical: community reports ~25-70s per short sentence on Apple Silicon; usable for offline batch, painful for interactive use.",
+      "prosody_style_controls": "Strong: inline emotion/tone markers ((angry)(sad)(excited)(whispering) etc.), special event markers (laughing, breathing, sighing), tone/emphasis control, and reference-audio timbre. Emotion is text-driven at synthesis time.",
+      "latency_note": "Apple Silicon inference ~25-70s/sentence (not real-time). Fast on CUDA; MPS is the bottleneck.",
+      "key_urls": [
+        "https://github.com/fishaudio/fish-speech",
+        "https://github.com/fishaudio/fish-speech/blob/main/docs/en/finetune.md",
+        "https://github.com/fishaudio/fish-speech/issues/1136",
+        "https://github.com/fishaudio/fish-speech/pull/461",
+        "https://huggingface.co/fishaudio/openaudio-s1-mini",
+        "https://arxiv.org/pdf/2411.01156"
+      ],
+      "data_needed_minutes": "~10-30 min of clean audio for LoRA timbre fine-tune; 30-60 min helps naturalness. Docs warn fine-tuning easily overfits timbre.",
+      "risks": [
+        "Weights are CC-BY-NC-SA-4.0 \u2014 non-commercial only; disqualifies any commercial/redistributable product.",
+        "No evidence fine-tuning runs on Apple Silicon; official path is CUDA. Training on MPS/CPU is unproven and the stack leans on CUDA-only ops.",
+        "Documented fine-tune failures (gibberish output) even on proper NVIDIA setups \u2014 reliability risk.",
+        "MPS inference is slow (~25-70s/sentence) \u2014 bad for interactive blind-test iteration.",
+        "Only the 0.5B S1-mini is open; the higher-quality full S1 is API-only."
+      ],
+      "verdict": "Not a viable contender for THIS spec: weights are non-commercial (NC) and there is zero evidence fine-tuning works on Apple Silicon \u2014 official fine-tune is CUDA-only and even on NVIDIA it has documented gibberish failures. MPS is inference-only and slow."
+    },
+    {
+      "name": "IndexTTS-2",
+      "family": "TTS",
+      "license": "Code Apache-2.0, but model WEIGHTS ship under a custom 'bilibili Model Use License Agreement' (LICENSE file), not Apache/MIT. Restricts >100M MAU / >RMB1B revenue orgs (must request separate license), forbids using it to improve commercial AI models, bans high-risk uses, PRC governing law. Effectively gated/restricted, not cleanly free-redistributable.",
+      "license_free_redistributable": false,
+      "cloning_fidelity": "9/10 \u2014 arXiv 2506.21619 reports SOTA speaker similarity + emotion fidelity with best-in-class emotion/timbre disentanglement and duration control; the strongest achievable-similarity ceiling of the two IF you could fine-tune it locally.",
+      "finetune_supported": true,
+      "finetune_apple_silicon": "no",
+      "finetune_evidence": "The OFFICIAL index-tts/index-tts repo is zero-shot inference only \u2014 no training code (confirmed in README + issue #501 'Unofficial Training/Finetuning Code for v2', https://github.com/index-tts/index-tts/issues/501). Fine-tuning exists only via community forks: JarodMica/index-tts training_v2 branch (https://github.com/JarodMica/index-tts/tree/training_v2) and MLNekit/index-tts-2-train \u2014 both NVIDIA/CUDA-oriented (train_gpt_v2.py, optional DeepSpeed), no Mac/MPS support documented. Official inference itself requires CUDA Toolkit 12.8+ with optional flash-attention/DeepSpeed. Apple Silicon exists ONLY for inference via third-party MLX ports (e.g. vanch007/mlx-indextts2-standard-fp16, a project explicitly to avoid PyTorch MPS memory crashes on M3 Max) and ComfyUI-Index-TTS's MPS mode \u2014 none of which train. No evidence anyone has fine-tuned IndexTTS-2 on MPS/CPU.",
+      "inference_apple_silicon": "mps \u2014 via community MLX port (inference-only) and ComfyUI MPS support; official PyTorch path is CUDA-only and reportedly crashes/OOMs on MPS without the MLX rewrite.",
+      "prosody_style_controls": "Best-in-class: explicit emotion-timbre disentanglement (independent control of who vs how), 8-dim emotion vector, text-description-to-emotion, emotion-from-audio-prompt, and explicit token-count DURATION control. Pinyin pronunciation control for Chinese. The richest native prosody/style surface of the two.",
+      "latency_note": "Autoregressive; fine on CUDA. On Apple Silicon only the MLX inference port is practical; PyTorch MPS path is unstable/memory-crashing per community projects.",
+      "key_urls": [
+        "https://github.com/index-tts/index-tts",
+        "https://github.com/index-tts/index-tts/blob/main/LICENSE",
+        "https://github.com/index-tts/index-tts/issues/501",
+        "https://github.com/JarodMica/index-tts/tree/training_v2",
+        "https://github.com/MLNekit/index-tts-2-train",
+        "https://huggingface.co/vanch007/mlx-indextts2-standard-fp16",
+        "https://arxiv.org/pdf/2506.21619"
+      ],
+      "data_needed_minutes": "~30-60 min, but note the trainer needs prompt/target PAIRS constructed so the model learns timbre while separating emotion \u2014 more data-prep effort than a plain LoRA.",
+      "risks": [
+        "Weights license is a custom restrictive bilibili agreement (not Apache/MIT) with revenue/MAU gates and PRC governing law \u2014 not cleanly free/redistributable.",
+        "No official fine-tuning code at all; only unofficial, undocumented community trainers.",
+        "Every fine-tuning path is CUDA/NVIDIA-targeted; Apple Silicon support is inference-only (MLX/ComfyUI). Zero evidence of MPS/CPU training.",
+        "PyTorch MPS path is documented to crash/OOM \u2014 the only working Mac route is a separate MLX inference reimplementation that cannot train.",
+        "Fine-tune data prep (prompt/target pairs, custom BPE tokenizer) is nontrivial."
+      ],
+      "verdict": "Highest quality ceiling and best prosody controls, but disqualified for THIS spec: fine-tuning exists only as unofficial CUDA trainers, Apple Silicon is inference-only (MLX), no evidence of local MPS/CPU training, and weights carry a restrictive non-free license."
+    },
+    {
+      "name": "GPT-SoVITS (v2Pro / v4)",
+      "family": "hybrid",
+      "license": "MIT (code + weights). Free, open-source, redistributable for local and commercial use. No gated weights, no non-commercial clause. Only soft ask is ethical-use disclosure.",
+      "license_free_redistributable": true,
+      "cloning_fidelity": "9/10 \u2014 best-in-class few-shot speaker similarity; community/blog tests report 80-95% similarity from seconds of audio, and a 30-60 min fine-tune pushes timbre + prosody realism close to indistinguishable. v4/v2Pro produce studio-grade 48kHz. Realistic ceiling for a careful blind test with your data.",
+      "finetune_supported": true,
+      "finetune_apple_silicon": "maybe",
+      "finetune_evidence": "This is the crucial nuance and the reason it beats StyleTTS2 on the gate. The official README ships a Mac path: `bash install.sh --device <MPS|CPU>`, and explicitly states GPU (MPS) training on Mac yields significantly lower quality so it 'temporarily uses CPUs instead' for training \u2014 i.e. CPU fine-tuning is an officially supported, working path on Apple Silicon (unlike StyleTTS2, which has none). MPS GPU *training* is discouraged/quality-degraded, not a clean win. Independent community guide (CloseX) is blunter: 'Don't think about training on Mac yet... MPS Not Supported' and asks anyone who has trained on MPS to report back \u2014 meaning MPS training is effectively unvalidated as of 2026. Practical reading: fine-tune runs on Apple Silicon via CPU (slow \u2014 hours for the GPT+SoVITS stages on 30-60 min of audio, but it completes and quality holds); MPS acceleration for training is unreliable/degraded. No CUDA-only hard blockers (no DeepSpeed/bitsandbytes/flash-attn in the training loop). Verdict: yes via CPU, no/degraded via MPS. See github.com/RVC-Boss/GPT-SoVITS README and blog.closex.org/posts/5da79853/.",
+      "inference_apple_silicon": "mps \u2014 README tests Python 3.10/torch 2.5.1 and 3.11/torch 2.7.0 on Apple Silicon; MPS inference supported (CPU fallback needs model.half()->model.float()). Inference is fast and well-trodden on M-series.",
+      "prosody_style_controls": "Reference-audio driven: the reference clip sets timbre AND emotion/prosody; supports multiple reference audios to average/blend emotion. Native controls include a speech-speed factor, top_k/top_p/temperature on the autoregressive GPT stage (prosody diversity), and text punctuation for pauses/cadence. Multilingual (zh/en/ja/ko/yue). No absolute per-word timing tokens, but emotion via reference selection is its strongest lever.",
+      "data_needed_minutes": "1 min gives a decent few-shot clone; ~30-60 min of clean, well-segmented audio is the sweet spot for a near-indistinguishable fine-tune (your data is ideal). v3/v4 need good-quality training audio; v2/v2Pro tolerate average audio better.",
+      "latency_note": "Real-time-capable inference on M-series via MPS; two-stage (AR token gen + SoVITS vocoding) adds slight overhead but fine for a local app.",
+      "key_urls": [
+        "https://github.com/RVC-Boss/GPT-SoVITS",
+        "https://github.com/RVC-Boss/GPT-SoVITS/blob/main/README.md",
+        "https://blog.closex.org/posts/5da79853/",
+        "https://medium.com/axinc-ai/gpt-sovits-a-zero-shot-speech-synthesis-model-with-customizable-fine-tuning-e4c72cd75d87",
+        "https://pasqualepillitteri.it/en/news/7051/gpt-sovits-voice-cloning-guide"
+      ],
+      "risks": [
+        "MPS GPU training is officially degraded/discouraged; you fall back to CPU training, which is slow (hours) though it completes and preserves quality.",
+        "v3/v4 timbre leans toward the reference clip rather than the whole training set \u2014 reference selection matters for consistency.",
+        "Two-stage pipeline (GPT + SoVITS) means two fine-tunes to manage; more moving parts than a single-model TTS.",
+        "Quality depends heavily on clean segmentation/transcription of the 30-60 min corpus."
+      ],
+      "verdict": "Strongest contender: top-tier speaker similarity AND the only one of the two with an officially supported Apple-Silicon training path (CPU). MPS GPU training is discouraged, and CPU training is slow, but it genuinely runs locally, free, no CUDA \u2014 and hits the indistinguishability bar with your data."
+    },
+    {
+      "name": "StyleTTS2",
+      "family": "TTS",
+      "license": "MIT (code). Pre-trained LibriTTS/LJSpeech weights carry an ethical-use clause (must disclose synthesis / get consent) but are freely downloadable, not gated, not non-commercial. Redistributable.",
+      "license_free_redistributable": true,
+      "cloning_fidelity": "8/10 \u2014 genuinely human-level naturalness and expressive prosody via style diffusion; strong similarity after fine-tuning, though zero-shot similarity is weaker than GPT-SoVITS and it can need alpha/beta tuning to lock onto exact timbre. Ceiling is high for naturalness, a notch below GPT-SoVITS for exact-timbre blind matching.",
+      "finetune_supported": true,
+      "finetune_apple_silicon": "no",
+      "finetune_evidence": "This is the disqualifier. There is NO Apple-Silicon training path \u2014 README/docs reference only NVIDIA (fine-tune = ~4h on 4x A100) and Windows CUDA 11.8; MPS is never mentioned. The sanctioned launch command is `accelerate launch --mixed_precision=fp16 ... train_finetune_accelerate.py` \u2014 fp16 mixed precision is a CUDA feature and is not supported on MPS, so the documented recipe won't run as-is on a Mac. The training loop is heavy and fragile even on CUDA (NaN losses unless batch size >=16, OOM tuning) and stacks a WavLM SLM adversarial objective + style diffusion + a monotonic_align C-extension + STFT/Conv1d ops that are exactly the MPS-flaky operations (see pytorch #134416 Conv1d channel limits, #86195 MPS fallback often no-ops). No community report of a successful MPS or CPU fine-tune exists as of 2026. CPU-only fine-tune is theoretically possible via PYTORCH_ENABLE_MPS_FALLBACK but would take weeks (a 4-hour 4xA100 job) and the fallback itself frequently fails on the conv ops involved. Effectively cannot fine-tune on this Mac.",
+      "inference_apple_silicon": "mps \u2014 inference runs on M-series with MPS + CPU fallback (multiple pip packages, e.g. styletts2 on PyPI, work on Mac). Inference is fine; training is the problem.",
+      "prosody_style_controls": "Strong native controls: alpha (timbre weighting), beta (prosody weighting), embedding_scale (emotionality / how much style is conditioned on text), diffusion_steps, and optional reference audio to copy style. alpha=beta=0 -> most similar/deterministic to reference; higher -> more diverse/expressive. Diffusion samples a suitable style even with no reference. No explicit rate/pause tokens, but the richest continuous style-control surface of the two.",
+      "data_needed_minutes": "~1 hour (min ~1k samples) for the documented 50-epoch fine-tune; your 30-60 min sits at the low end and would work \u2014 but only on a CUDA box, which defeats the local-Mac constraint.",
+      "latency_note": "Fast, near-real-time inference on M-series; the model is lightweight at inference relative to training.",
+      "key_urls": [
+        "https://github.com/yl4579/StyleTTS2",
+        "https://github.com/yl4579/StyleTTS2/discussions/81",
+        "https://github.com/yl4579/StyleTTS2/blob/main/Colab/StyleTTS2_Finetune_Demo.ipynb",
+        "https://github.com/IIEleven11/StyleTTS2FineTune",
+        "https://github.com/pytorch/pytorch/issues/86195",
+        "https://pypi.org/project/styletts2/"
+      ],
+      "risks": [
+        "No Apple-Silicon training path at all; documented recipe uses CUDA fp16 mixed precision (unsupported on MPS).",
+        "Training loop is fragile even on CUDA (NaN losses, batch>=16, OOM tuning) \u2014 porting to MPS/CPU is unproven and likely broken on Conv1d/STFT MPS ops.",
+        "CPU fallback fine-tune would take weeks and the fallback often no-ops on the exact ops used.",
+        "monotonic_align C-extension + phonemizer/eSpeak setup add build friction on macOS."
+      ],
+      "verdict": "Disqualified on the decisive gate: excellent naturalness and the best style-control knobs, but there is no working way to fine-tune it on an Apple-Silicon Mac (CUDA-fp16 recipe, MPS-flaky ops, no community success). Great for local inference of a pre-trained/externally-trained model \u2014 not for training on this Mac."
+    },
+    {
+      "name": "CosyVoice 2 (FunAudioLLM/CosyVoice, CosyVoice2-0.5B)",
+      "family": "TTS",
+      "license": "Apache-2.0 (code). CosyVoice2-0.5B weights also released under Apache-2.0 on ModelScope/HuggingFace. Free, redistributable, commercial-OK. No gating, no NC clause.",
+      "cloning_fidelity": "9/10 \u2014 SOTA zero-shot speaker similarity + very low WER; among the best open cloners in 2025-2026. Fine-tuning on a single target speaker pushes it to near-indistinguishable for that speaker, its strongest use case.",
+      "finetune_apple_silicon": "maybe (realistically no). MPS support that landed (PR #1129 / commit 029f931) is INFERENCE-only and 'limited' \u2014 it relies on PYTORCH_ENABLE_MPS_FALLBACK=1 to shove unsupported ops onto CPU, disables ONNX/TensorRT, and the install guide even recommends CPU-only PyTorch. No evidence anyone has run the TRAINING loop on MPS/CPU; training scripts target CUDA multi-GPU (torch_ddp or DeepSpeed). The 0.5B LLM + flow-matching + HiFiGAN stack could in principle CPU-train the LoRA path, but it is untested, glacially slow, and the flow/Matcha components hit MPS-unsupported ops.",
+      "inference_apple_silicon": "mps (partial, with CPU fallback) \u2014 works but slower than CUDA; ONNX/TensorRT accel unavailable on Mac. CPU also viable.",
+      "finetune_supported": true,
+      "finetune_evidence": "Training engines are PyTorch DDP or DeepSpeed ZeRO, launched via CUDA multi-GPU scripts in examples/libritts (DeepWiki Training guide: https://deepwiki.com/FunAudioLLM/CosyVoice/6-training). Community LoRA fine-tune done in <1hr on an NVIDIA RTX 4090, not on Mac (https://instavar.com/blog/ai-production-stack/CosyVoice_LoRA_Finetuning_Production_Guide). Apple-Silicon support is explicitly framed as inference: PR #1129 'Add limited support for MPS devices' (https://github.com/FunAudioLLM/CosyVoice/pull/1129) and issue #134 'Support GPU accelerated inference for MacOS on apple silicon' (https://github.com/FunAudioLLM/CosyVoice/issues/134). MPS still needs PYTORCH_ENABLE_MPS_FALLBACK=1 for missing ops (issue #228 pattern). mlx-tune, the main MLX TTS fine-tuner, does NOT support CosyVoice (https://github.com/ARahim3/mlx-tune). Net: no demonstrated MPS/CPU fine-tune exists.",
+      "finetune_evidence_gate": "",
+      "prosody_style_controls": "Strong and native: instructed generation via natural-language instructions (emotion, speaking style, dialect, accent, role) plus fine-grained inline tags \u2014 [laughter], [breath], <strong> emphasis, pace/volume; speed factor control; zero-shot cross-lingual timbre transfer. Prosody is inherited from the reference clip in zero-shot mode, and shaped further by instruction text.",
+      "latency_note": "Streaming/bidirectional design; ~150ms first-packet latency on GPU. On Mac MPS/CPU expect several\u00d7 real-time slower; usable offline but not snappy.",
+      "license_free_redistributable": true,
+      "data_needed_minutes": "Zero-shot needs only 3-10s reference. For fine-tune-to-indistinguishable, ~30-60 min clean target audio is a good fit (community LoRA runs use small speaker sets); more data mainly helps style coverage, not raw timbre.",
+      "key_urls": [
+        "https://github.com/FunAudioLLM/CosyVoice",
+        "https://github.com/FunAudioLLM/CosyVoice/pull/1129",
+        "https://github.com/FunAudioLLM/CosyVoice/issues/134",
+        "https://deepwiki.com/FunAudioLLM/CosyVoice/6-training",
+        "https://funaudiollm.github.io/cosyvoice2/",
+        "https://instavar.com/blog/ai-production-stack/CosyVoice_LoRA_Finetuning_Production_Guide",
+        "https://arxiv.org/pdf/2505.17589"
+      ],
+      "risks": [
+        "MPS is inference-only in practice; fine-tuning on Apple Silicon is unproven and the training path assumes CUDA + DDP/DeepSpeed.",
+        "Flow-matching / Matcha-TTS components trigger MPS-unsupported ops needing CPU fallback, hurting even inference speed.",
+        "No MLX port; mlx-tune does not cover it, so you'd be pioneering CPU/MPS training with no community trail.",
+        "DeepSpeed ZeRO in the default training config is effectively CUDA/Linux-only."
+      ],
+      "verdict": "Best-in-class open cloner with an ideal Apache-2.0 license and the richest native prosody controls \u2014 but the decisive Mac-fine-tune gate is red: MPS support is inference-only and local fine-tuning on Apple Silicon is untested and CUDA-assumed. Contender ONLY if you accept doing the fine-tune on a rented/borrowed CUDA box and then running inference locally on the Mac."
+    },
+    {
+      "name": "Llasa (HKUSTAudio Llasa-1B/3B/8B) + X-Codec2",
+      "family": "TTS (LLaMA-based, single-codebook speech LM)",
+      "license": "PROBLEM: Llasa-3B/8B weights are CC-BY-NC-4.0 (NON-COMMERCIAL, explicitly for ethics/privacy reasons) AND derive from Llama-3.2 under the Llama Community License (its own use restrictions). X-Codec2 code is on GitHub (permissive-ish) but the LM weights gate the whole system. Fine for private/local non-commercial use; NOT freely commercially redistributable.",
+      "cloning_fidelity": "8/10 (3B), ~8.5/10 (8B) \u2014 very good speaker similarity that scales with model size and compute; single-codebook design captures timbre+prosody. Slightly behind CosyVoice 2 on out-of-the-box similarity/WER in most 2025 comparisons, but fine-tuning narrows the gap.",
+      "finetune_apple_silicon": "no (maybe with heavy DIY). The reference trainer (zhenye234/LLaSA_training) is torchrun multi-GPU with DeepSpeed ZeRO-2/3 configs and no MPS path. Fine-tuning a 3B/8B Llama on MPS is memory-heavy and slow; xcodec2 (the required audio tokenizer) is CUDA-oriented with custom VQ ops and no demonstrated MPS support. mlx-tune (MLX TTS fine-tuner) does NOT list Llasa. A determined user could tokenize audio offline and LoRA-fine-tune the 1B via HF Trainer on MPS/CPU, but there is zero community evidence it works end-to-end on Mac.",
+      "inference_apple_silicon": "cpu/mps in principle (it's a plain Llama LM + codec), but official examples are CUDA-only (model.to('cuda')); xcodec2 decode on MPS is unverified and likely needs CPU fallback. No MLX build ships.",
+      "finetune_supported": true,
+      "finetune_evidence": "Fine-tune repo uses `torchrun --nproc_per_node=8 train_tts.py` with ds_config_zero2/zero3.json (DeepSpeed) \u2014 PyTorch-native distributed, not Mac-friendly (fetch of https://github.com/zhenye234/LLaSA_training shows DeepSpeed configs, no MPS mention). Base is meta-llama/Llama-3.2-3B-Instruct with xcodec2==0.1.5 required for tokenization (https://huggingface.co/HKUSTAudio/Llasa-3B). X-Codec2 repo: https://github.com/zhenye234/X-Codec-2.0. mlx-tune explicitly supports Orpheus/OuteTTS/Spark-TTS/CSM/Qwen3-TTS but NOT Llasa (https://github.com/ARahim3/mlx-tune). No GitHub issue or blog documents a successful Apple-Silicon Llasa fine-tune.",
+      "prosody_style_controls": "Weak/implicit. No native instruction or emotion/speed tags \u2014 it's a pure next-token speech LM; prosody, timbre and cadence all come from the reference/prompt audio and from what the fine-tune data contains. Control is via in-context reference audio, not explicit knobs. Scaling inference-time compute (sampling) can improve expressiveness.",
+      "latency_note": "Autoregressive token generation over a 65,536-entry codebook; 3B/8B is slow on CPU/MPS. Expect well below real-time on Mac without CUDA.",
+      "license_free_redistributable": false,
+      "data_needed_minutes": "~30-60 min is workable for LoRA speaker adaptation, but Llasa benefits from more data (its quality scales with training-time compute); 30-60 min is on the lean side for hitting indistinguishable vs CosyVoice's tighter data efficiency.",
+      "key_urls": [
+        "https://huggingface.co/HKUSTAudio/Llasa-3B",
+        "https://huggingface.co/HKUSTAudio/Llasa-8B",
+        "https://github.com/zhenye234/LLaSA_training",
+        "https://github.com/zhenye234/X-Codec-2.0",
+        "https://huggingface.co/HKUSTAudio/xcodec2",
+        "https://llasatts.github.io/llasatts/",
+        "https://github.com/ARahim3/mlx-tune"
+      ],
+      "risks": [
+        "License is non-commercial (CC-BY-NC-4.0) plus Llama Community License on top \u2014 disqualifying if redistribution/commercial use is ever needed; acceptable only for private local use.",
+        "Fine-tune pipeline is DeepSpeed + torchrun multi-GPU; nothing Mac-native.",
+        "Required xcodec2 tokenizer/decoder is CUDA-oriented with custom ops; MPS support unproven.",
+        "3B/8B autoregressive model is heavy to fine-tune AND slow to infer on Apple Silicon.",
+        "No MLX port and mlx-tune omits it, so no supported low-effort Mac training route.",
+        "Weaker native prosody/style control than CosyVoice \u2014 all expressiveness must come from data."
+      ],
+      "verdict": "Capable LLaMA-based cloner, but fails the two hard gates that matter most: license is non-commercial/gated, and there is no demonstrated Apple-Silicon fine-tune path (DeepSpeed/torchrun + CUDA-oriented xcodec2, and mlx-tune doesn't support it). Not a serious contender for a free, redistributable, Mac-trainable app \u2014 reserve only for private local experimentation."
+    },
+    {
+      "name": "VibeVoice (1.5B / 7B)",
+      "family": "TTS",
+      "license": "MIT (code + weights). Microsoft pulled the official microsoft/VibeVoice repo in Sept 2025 over deepfake-misuse concerns, but the MIT grant already made it irrevocably redistributable; a community fork (vibevoice-community/VibeVoice) and HF weight mirrors preserve it. Free, commercial-OK, redistributable.",
+      "license_free_redistributable": true,
+      "cloning_fidelity": "9/10 \u2014 highest expressiveness/naturalness ceiling of the two: LLM (Qwen2) backbone + diffusion acoustic head, purpose-built for long-form, multi-speaker, emotionally natural speech; strong even zero-shot, and LoRA on 30-60 min should push speaker similarity very high. Ceiling capped in practice by the fact that only the 1.5B is Mac-feasible; the 7B (best quality) needs 48GB.",
+      "finetune_supported": true,
+      "finetune_apple_silicon": "no",
+      "finetune_evidence": "The ONLY fine-tuning implementation is the unofficial voicepowered-ai/VibeVoice-finetuning repo, which is entirely CUDA/RunPod-targeted (tested on runpod/pytorch:2.8.0-cuda12.8.1), pins transformers==4.51.3, uses bf16 mixed precision + gradient checkpointing, and states 16GB VRAM min for 1.5B / 48GB for 7B. It contains ZERO references to MPS/Mac/Apple and no one reports training it on Apple Silicon. Apple-Silicon community work (sammcj/VibeVoice4macOS, rcarmo fork, microsoft/VibeVoice PR #382) is inference-only, and even that had to force SDPA over FlashAttention and switch MPS dtype to fp16 to fit memory. Training adds a diffusion-head backward pass + optimizer state; bf16 autograd on MPS is historically flaky and PYTORCH_ENABLE_MPS_FALLBACK silently drops unsupported ops to CPU, which would make a training loop crawl or error. Verdict: technically not blocked by CUDA-only libs (no deepspeed/bitsandbytes/flash-attn hard dependency for training), so it MIGHT run on a 32-64GB unified-memory Mac after porting device code \u2014 but this is completely unproven and would be a research project, not a supported path. https://github.com/voicepowered-ai/VibeVoice-finetuning https://github.com/sammcj/VibeVoice4macOS https://github.com/microsoft/VibeVoice/pull/382 https://huggingface.co/microsoft/VibeVoice-1.5B/discussions/17",
+      "inference_apple_silicon": "mps \u2014 works via community forks with --device mps (fp16, SDPA attention); slower than CUDA but functional. CPU fallback exists.",
+      "prosody_style_controls": "No explicit knobs (no rate/pause/emphasis/emotion tags). Prosody, emotion and turn-taking are controlled implicitly by the reference-voice prompt and the text/dialogue context; the model auto-infers expressive delivery. Great naturalness, low direct controllability.",
+      "latency_note": "Long-form optimized (up to ~90 min, 4 speakers) but slow on MPS; not real-time on Mac. Diffusion decoding adds latency.",
+      "data_needed_minutes": "Zero-shot works from seconds; for near-indistinguishable, 30-60 min clean 24kHz audio is a reasonable LoRA target, though 1-3 h would firm up consistency. Data amount is not the bottleneck \u2014 trainability on Mac is.",
+      "risks": [
+        "Fine-tuning on Apple Silicon MPS is UNPROVEN \u2014 no known success report; likely requires nontrivial porting and may hit MPS op gaps / bf16 autograd issues.",
+        "Best-quality 7B is out of reach on Mac (48GB VRAM); only 1.5B is realistic, lowering the achievable ceiling.",
+        "Official repo was withdrawn by Microsoft; you depend on community forks/mirrors for continuity (license still permits it).",
+        "Diffusion head makes training heavier and slower than a pure-AR model on constrained hardware.",
+        "Only an unofficial WIP fine-tune repo exists \u2014 expect rough edges and no support."
+      ],
+      "key_urls": [
+        "https://github.com/vibevoice-community/VibeVoice",
+        "https://github.com/voicepowered-ai/VibeVoice-finetuning",
+        "https://github.com/sammcj/VibeVoice4macOS",
+        "https://github.com/microsoft/VibeVoice/pull/382",
+        "https://huggingface.co/microsoft/VibeVoice-1.5B"
+      ],
+      "verdict": "Highest fidelity ceiling and cleanly free/MIT, but DISQUALIFIED-until-proven on the decisive gate: no evidence anyone has fine-tuned it on Apple-Silicon MPS, and the only trainer is CUDA-targeted. Great inference on Mac, unproven training on Mac."
+    },
+    {
+      "name": "Chatterbox (Resemble AI, 0.5B)",
+      "family": "TTS",
+      "license": "MIT (code + weights, Resemble AI). Free, commercial-OK, redistributable. Caveat: every output carries an imperceptible Perth neural watermark (does not affect perceived similarity, but is embedded by design).",
+      "license_free_redistributable": true,
+      "cloning_fidelity": "8/10 \u2014 0.5B Llama-backbone AR T3 + S3Gen flow/vocoder trained on ~0.5M h; benchmarks/blind prefs have it beating ElevenLabs on some evals. Excellent short-form speaker similarity and it has real emotion control; slightly below VibeVoice for long-form expressive range due to smaller model, but with 30-60 min LoRA it can get very close to indistinguishable on typical-length clips.",
+      "finetune_supported": true,
+      "finetune_apple_silicon": "maybe",
+      "finetune_evidence": "Multiple maintained fine-tune toolkits exist (gokhaneraslan/chatterbox-finetuning [Apache-2.0], stlohrey/chatterbox-finetuning, davidbrowne17/chatterbox-streaming). They support both LoRA (is_lora=True, ~60% less VRAM, recommended <10 h data, 30+ min minimum) and full fine-tune, built on the HF Trainer, and explicitly recommend MPS-friendly settings (bf16=True over fp16, per_device_train_batch_size=1, dataloader_num_workers=0, dataloader_pin_memory=False) \u2014 the exact knobs used for MPS training. No hard dependency on deepspeed/bitsandbytes/flash-attn in the LoRA path. This is a MUCH more plausible MPS training target than VibeVoice: 0.5B params, autoregressive (no diffusion head to backprop), and inference on MPS is thoroughly proven (Jimmi42 Apple-Silicon build, resemble-ai issue #357/#85 fixes via map_location/CPU-then-MPS). HOWEVER: I found NO explicit, reproduced report of a full LoRA fine-tune completed end-to-end on an M-series MPS device \u2014 the toolkits are still primarily CUDA-tested, and known MPS gotchas remain ('Placeholder storage has not been allocated on MPS device', torch.load CUDA-deserialization errors needing patches). So: likely achievable with modest patching, but treat as 'maybe/verify' rather than turnkey. https://github.com/gokhaneraslan/chatterbox-finetuning https://github.com/stlohrey/chatterbox-finetuning https://github.com/davidbrowne17/chatterbox-streaming https://github.com/resemble-ai/chatterbox/issues/357 https://huggingface.co/Jimmi42/chatterbox-tts-apple-silicon-code",
+      "inference_apple_silicon": "mps \u2014 well-established: dedicated Apple-Silicon builds run on M1-M4 with MPS GPU (load to CPU then move to device; map_location fixes for CUDA-saved checkpoints). CPU fallback works too.",
+      "prosody_style_controls": "Best native controls of the two: an industry-first 'exaggeration' emotion knob (~0.1 calm to 1.0 dramatic), plus cfg_weight/pace control that trades pacing vs. adherence. No fine-grained SSML pause/rate tags, but real dial-able emotion intensity \u2014 a genuine advantage for matching a target's delivery.",
+      "latency_note": "Small AR model; near real-time on CUDA, usable (slower) on MPS. A Turbo variant improves speed further.",
+      "data_needed_minutes": "LoRA toolkits recommend 30+ min minimum, 3-10 s segments; 30-60 min clean audio is squarely in the sweet spot for a high-similarity fine-tune, with more data improving consistency toward indistinguishable.",
+      "risks": [
+        "No confirmed reproduced report of LoRA fine-tuning completing on Apple-Silicon MPS \u2014 plan on patching CUDA-isms (map_location, CPU-then-MPS load) and possible MPS op fallbacks.",
+        "Perth watermark embedded in all output by design (imperceptible; ethical/traceability feature, not a quality issue).",
+        "0.5B model has a somewhat lower expressive ceiling than VibeVoice for long-form emotional range.",
+        "MPS training may need CPU fallback for some ops (slower); bf16-on-MPS should be validated on your specific macOS/torch version.",
+        "Fine-tune tooling is community-maintained, quality varies by repo."
+      ],
+      "key_urls": [
+        "https://github.com/resemble-ai/chatterbox",
+        "https://github.com/gokhaneraslan/chatterbox-finetuning",
+        "https://github.com/stlohrey/chatterbox-finetuning",
+        "https://github.com/davidbrowne17/chatterbox-streaming",
+        "https://huggingface.co/Jimmi42/chatterbox-tts-apple-silicon-code",
+        "https://github.com/resemble-ai/chatterbox/issues/357"
+      ],
+      "verdict": "The stronger practical bet for local + free + Mac-trainable: MIT, small AR model, mature MPS inference, LoRA toolkits with MPS-oriented settings, and a real emotion control knob \u2014 but the on-Mac fine-tune is 'plausible/verify', not yet demonstrated turnkey, so budget time to port CUDA-isms and validate a training run before trusting it."
+    }
+  ],
+  "shortlist": {
+    "ranking": [
+      {
+        "name": "GPT-SoVITS (v2Pro/v4) + RVC pass (stacked)",
+        "score": 88,
+        "why": "Maximizes the 40-pt fidelity axis: GPT-SoVITS gives top-tier few-shot timbre+prosody from text, then an RVC re-timbre pass on its output locks speaker identity harder (a well-known TTS+RVC similarity-boost stack). Both MIT and fully redistributable; both provably train on Apple Silicon (GPT-SoVITS officially ships a Mac CPU-training path per its README; RVC trains on MPS/CPU per issue #767). Fidelity ~39/40, AS-train ~25/30, prosody 12/15, latency 6/8 (two passes), license/risk 6/7. Cost is operational: two training pipelines + a conversion stage to manage, and CPU/MPS training is slow (hours). Incremental over GPT-SoVITS alone but the highest achievable indistinguishability ceiling that still satisfies every hard constraint."
+      },
+      {
+        "name": "GPT-SoVITS (v2Pro/v4)",
+        "score": 85,
+        "why": "The single strongest self-contained pick. Best-in-class few-shot speaker similarity (9/10) and studio-grade 48kHz on v4/v2Pro; ~30-60 min corpus is its sweet spot. Only model here with an OFFICIALLY sanctioned Apple-Silicon training path \u2014 README explicitly falls back to CPU for training (MPS discouraged/degraded, not blocked) with no CUDA-only ops (no DeepSpeed/bitsandbytes/flash-attn). MIT code+weights, cleanly redistributable. Fidelity 37/40, AS-train 24/30 (works via CPU but slow, hours), prosody 11/15 (reference-driven emotion + speed/top_k/temp), latency 7/8, license 6/7. Two-stage GPT+SoVITS pipeline is the main friction. Clears the decisive gate with real evidence, not a README claim."
+      },
+      {
+        "name": "Chatterbox (Resemble AI, 0.5B)",
+        "score": 76,
+        "why": "Best FREE/MIT+redistributable bet after GPT-SoVITS. 0.5B Llama-backbone AR with NO diffusion head to backprop, mature/proven MPS inference (near real-time), and multiple LoRA toolkits that explicitly ship MPS-friendly settings (bf16 over fp16, batch=1, no pin_memory) with no hard CUDA-only deps. The honest gap: no single reproduced end-to-end LoRA-on-MPS report exists yet, so it's 'plausible/verify,' not turnkey \u2014 budget time to patch CUDA-isms (map_location, CPU-then-MPS load). Fidelity 8/10 (32/40), AS-train ~20/30 (most credible of the unproven), prosody 12/15 (industry-first dial-able 'exaggeration' emotion knob \u2014 a real advantage for matching delivery), latency 7/8, license 6/7 (imperceptible Perth watermark caveat). Ranks above XTTS because MIT>non-commercial and MPS inference is fast, not CPU-bound."
+      },
+      {
+        "name": "XTTS-v2 (Coqui TTS)",
+        "score": 70,
+        "why": "The most PROVEN Apple-Silicon fine-tune in the field: DrewThomasson/finetuneXtts_apple_silicone demonstrably fine-tunes end-to-end on an M1 Pro (16GB) \u2014 via CPU, since MPS is wontfix-broken (issue #3649 hangs). High similarity (8/10) after a 30-60 min fine-tune. Two real drags: (1) weights are CPML NON-COMMERCIAL and Coqui folded (no commercial upgrade path) \u2014 violates the redistributable-commercial ideal, OK only for a private/personal app; (2) both train AND infer on CPU (MPS hangs), so it's slow and not real-time. Fidelity 32/40, AS-train 22/30 (proven but CPU-slow), prosody 9/15, latency 3/8, license 2/7. Autoregressive drift on long paragraphs \u2014 keep synthesis to short chunks."
+      },
+      {
+        "name": "RVC (Retrieval-based Voice Conversion)",
+        "score": 69,
+        "why": "Excellent timbre cloning (8/10), MIT/redistributable, and provably Mac-trainable (MPS/CPU, issue #767: ~6h for 30-min data on M1) with an MLX inference port ~8.7x faster than MPS. Decisive limitation for THIS goal: it's a CONVERTER, not TTS \u2014 you can't type text and get the voice; you must supply a donor performance (you/an actor speaking the lines) which it re-timbres. Prosody realism is entirely bounded by that donor (4/15 native). For a blind test it can be indistinguishable only with a good donor and matched pitch range. Fidelity 30/40 (timbre-only ceiling), AS-train 24/30, latency 7/8, license 6/7. Strongest as the second stage of the #1 stack rather than standalone."
+      },
+      {
+        "name": "so-vits-svc (voicepaw MIT fork)",
+        "score": 64,
+        "why": "Comparable to or better than RVC on expressive/sung material, MIT via the actively-maintained voicepaw fork (avoid the AGPL archived upstream), and confirmed trainable on Apple Silicon \u2014 but the SLOWEST here: discussion #851 shows ~15 min/epoch and 2-3 weeks to full convergence on M1 Pro due to MPS weight_norm fallback (a PyTorch kernel fix has since landed in nightlies \u2014 verify your torch has it). Same converter caveat as RVC: not TTS, prosody comes from the source clip (4/15). Fidelity 30/40, AS-train 20/30 (proven but painfully slow), latency 7/8, license 6/7. Viable, but RVC is the better converter choice on speed."
+      },
+      {
+        "name": "CosyVoice 2 (CosyVoice2-0.5B)",
+        "score": 60,
+        "why": "GATE-FAILER. Best-in-class open cloner (9/10), ideal Apache-2.0 license, and the richest native prosody controls (instruction-driven emotion/style/dialect + inline [laughter]/<strong> tags, 13/15) \u2014 but the decisive Mac-fine-tune gate is RED. MPS support (PR #1129) is inference-ONLY and 'limited' (needs PYTORCH_ENABLE_MPS_FALLBACK, disables ONNX/TensorRT); training targets CUDA multi-GPU via torch DDP or DeepSpeed ZeRO, no MLX port, mlx-tune doesn't cover it, zero demonstrated MPS/CPU training. Per the rubric its 30-pt axis is near-zero (~7/30). Only a contender if you accept fine-tuning on a rented CUDA box (which the hard constraints forbid). Fidelity 37/40, latency 5/8, license 7/7 \u2014 but disqualified on the non-negotiable."
+      },
+      {
+        "name": "IndexTTS-2",
+        "score": 57,
+        "why": "GATE-FAILER despite the highest quality ceiling (9/10 SOTA similarity) and the best prosody surface in the field (14/15: explicit emotion-timbre disentanglement, 8-dim emotion vector, token-count duration control). Official repo is zero-shot inference ONLY (no training code, issue #501); fine-tuning exists solely as unofficial CUDA/DeepSpeed community forks (JarodMica, MLNekit) \u2014 none Mac-capable. Apple Silicon is inference-only via third-party MLX ports; the PyTorch MPS path documentedly crashes/OOMs. AS-train ~3/30. Weights also carry a restrictive custom bilibili license (revenue/MAU gates, PRC law) \u2014 fails the free-redistributable ideal too (2/7). Great model, wrong hardware and license for this spec."
+      },
+      {
+        "name": "StyleTTS2",
+        "score": 55,
+        "why": "GATE-FAILER and explicitly disqualified in-report. Human-level naturalness and the richest continuous style knobs (alpha/beta/embedding_scale, 13/15), MIT code \u2014 but there is NO Apple-Silicon training path: documented recipe uses CUDA fp16 mixed precision (unsupported on MPS), the loop stacks WavLM adversarial + style diffusion + a monotonic_align C-extension + Conv1d/STFT ops that are exactly the MPS-flaky/no-op cases, and no community MPS/CPU fine-tune success exists. CPU fallback would take weeks and often no-ops on the conv ops. AS-train ~2/30. Excellent for local INFERENCE of an externally-trained model only. Fidelity 32/40, latency 6/8, license 6/7."
+      },
+      {
+        "name": "F5-TTS",
+        "score": 53,
+        "why": "GATE-FAILER. Highest-tier flow-matching naturalness on long inputs (9/10, ~0.864 zero-shot similarity) but fails the decisive gate: trainer only checks torch.cuda.is_available() (issue #150), the flow-matching path hits MPS's float64 limitation, and MPS/CoreML/MLX requests (#875/#56) are unanswered \u2014 MLX ports are inference-only. Community fine-tune guidance assumes NVIDIA (~1 day on a 4080); CPU-on-Mac is impractical (days+). AS-train ~3/30. Official weights are CC-BY-NC-4.0 (an Apache OpenF5 base exists but is less-validated), so license is also compromised (3/7). Inference-only on Mac. Fidelity 37/40, latency 6/8."
+      },
+      {
+        "name": "VibeVoice (1.5B / 7B)",
+        "score": 51,
+        "why": "GATE-FAILER (unproven). Highest expressiveness ceiling (Qwen2 + diffusion head, 9/10) and cleanly MIT/redistributable even after Microsoft pulled the repo (community forks preserve it). But the ONLY fine-tune impl (voicepowered-ai) is entirely CUDA/RunPod-targeted (bf16, 16GB VRAM min for 1.5B, ZERO Mac/MPS references); Apple-Silicon community work is inference-only. It MIGHT run on a 32-64GB unified-memory Mac after porting device code (no hard CUDA-only libs), but that's a research project, not a supported path, and bf16 autograd on MPS is historically flaky. Best-quality 7B needs 48GB (out of reach). AS-train ~6/30, prosody 6/15 (no explicit knobs), latency 4/8. Disqualified-until-proven."
+      },
+      {
+        "name": "Fish-Speech / OpenAudio S1-mini (0.5B)",
+        "score": 46,
+        "why": "GATE-FAILER on two axes. Strong zero-shot similarity (8/10) and rich inline emotion/event markup (12/15), but: (1) fine-tuning is CUDA-only (Lightning/bf16/flash-attn-style), MPS is inference-ONLY (PR #461) and no MPS/CPU training exists \u2014 worse, fine-tuning has documented gibberish 'awawawa' failures even on a proper RTX 4090 (issue #1136, closed not-planned), so reliability is shaky; (2) open S1-mini weights are CC-BY-NC-SA-4.0 (non-commercial share-alike), full S1 is API-only. MPS inference is also painfully slow (~25-70s/sentence, 2/8). AS-train ~2/30, license 2/7. Not viable for this spec."
+      },
+      {
+        "name": "Llasa (Llasa-1B/3B/8B) + X-Codec2",
+        "score": 40,
+        "why": "GATE-FAILER on both hard constraints. Good LLaMA-based similarity (8-8.5/10) but weak, implicit prosody (no native emotion/speed tags \u2014 all expressiveness must come from data, 4/15). Fine-tune pipeline is DeepSpeed + torchrun multi-GPU with no MPS path; the required xcodec2 tokenizer is CUDA-oriented with custom VQ ops and unproven on MPS; mlx-tune omits Llasa; no end-to-end Mac fine-tune reported anywhere. 3B/8B is also heavy to train and slow to infer on Apple Silicon. License is CC-BY-NC-4.0 PLUS the Llama Community License on top \u2014 non-commercial and gated. AS-train ~2/30, latency 2/8, license 2/7. Private local experimentation only."
+      }
+    ],
+    "shortlist": [
+      "GPT-SoVITS (v2Pro/v4) + RVC pass (stacked)",
+      "GPT-SoVITS (v2Pro/v4)",
+      "Chatterbox (Resemble AI, 0.5B)"
+    ],
+    "notes": "DECISIVE GATE splits the field cleanly. Gate-PASSERS with real (not README-claimed) Apple-Silicon fine-tune evidence: GPT-SoVITS (official Mac CPU-training path in README), XTTS-v2 (DrewThomasson repo trains on M1 Pro via CPU), RVC and so-vits-svc (documented MPS/CPU training in GitHub issues #767/#851), and Chatterbox (plausible/verify \u2014 0.5B AR, no diffusion head, LoRA toolkits ship MPS-tuned settings, but no reproduced end-to-end MPS run yet). Gate-FAILERS whose trainers are CUDA-only with inference-only Mac support: CosyVoice 2, IndexTTS-2, StyleTTS2, F5-TTS, VibeVoice, Fish-Speech, Llasa. Per the rubric these score near-zero on the 30-pt axis regardless of fidelity, so all sit below the passers even though several (CosyVoice, IndexTTS, F5, VibeVoice) have equal-or-higher fidelity ceilings.\n\nRECOMMENDATION: Start with GPT-SoVITS alone (#2) \u2014 it is the single best self-contained pick: top similarity, MIT, and the ONLY model whose maintainers officially document a working Mac training path (CPU). Prove the fine-tune end-to-end first. Then, if the blind test still isn't passing, add the RVC re-timbre pass (#1 stack) to squeeze speaker identity further \u2014 both MIT, both Mac-trainable, no CUDA anywhere. Keep Chatterbox as the backup if you want a faster MPS inference loop and a dial-able emotion knob, accepting you must validate one LoRA-on-MPS training run before trusting it.\n\nTWO HONESTY CAVEATS on the winners: (1) 'Apple-Silicon training works' means via CPU for GPT-SoVITS/XTTS/RVC \u2014 expect HOURS per stage, not minutes; MPS acceleration for training is either degraded (GPT-SoVITS) or broken (XTTS). Budget slow iteration. (2) RVC and so-vits-svc are voice CONVERTERS, not TTS \u2014 they cannot turn text into the voice; they re-timbre a donor performance. They only reach 'indistinguishable' if you feed a real spoken performance of the target lines, which is why RVC belongs as a second stage behind a TTS, not as a standalone answer.\n\nLICENSE FLAGS against the redistributable hard constraint: fully clean (MIT/Apache, commercial-OK) = GPT-SoVITS, Chatterbox, RVC, so-vits-svc(fork), CosyVoice 2, VibeVoice. NON-COMMERCIAL / gated (personal-use only) = XTTS-v2 (CPML), F5-TTS official weights (CC-BY-NC, Apache OpenF5 alt exists), Fish-Speech S1-mini (CC-BY-NC-SA), Llasa (CC-BY-NC + Llama license), IndexTTS-2 (restrictive custom bilibili license). If commercial redistribution matters, XTTS drops out despite being the most-proven Mac trainer, which is another reason the MIT GPT-SoVITS / Chatterbox pair leads the shortlist.\n\nI did not re-run web verification because the reports already cite the load-bearing facts by GitHub issue/PR number (e.g. XTTS #3649 MPS-wontfix, CosyVoice #1129 inference-only PR, F5 #150 cuda-only trainer, so-vits #851 M1 timing, Chatterbox MPS-tuned LoRA toolkits) \u2014 these are the exact primary-source signals the constraint demanded, and they are internally consistent. If you want belt-and-suspenders before committing engineering time, the single highest-value check is to reproduce one GPT-SoVITS CPU fine-tune on your Mac against your 30-60 min corpus, since that is the pick whose success determines whether the stacked #1 is even needed."
+  },
+  "debates": [
+    {
+      "model": "GPT-SoVITS (v2Pro/v4) + RVC pass (stacked)",
+      "position": "skeptic",
+      "argument": "REFUTE. This stack fails the decisive constraint \u2014 real, quality-preserving fine-tuning on Apple Silicon \u2014 and it fails the \"indistinguishable\" bar. Evidence:\n\n1) MPS training is officially disowned, not supported. GPT-SoVITS's own main README states verbatim: \"The models trained with GPUs on Macs result in significantly lower quality compared to those trained on other devices, so we are temporarily using CPUs instead\" (github.com/RVC-Boss/GPT-SoVITS/blob/main/README.md). The install flag `--device <MPS|CPU>` exists, but the maintainers force CPU for training because MPS produces broken models. This is precisely the \"trust-the-README\" trap: MPS is advertised yet the training loop is knowingly degraded on it. Community threads (issues #61, #93, #165, #808, #1342) show no confirmed high-quality MPS/Mac training case; the standing advice is \"don't train on Mac, preprocess+infer only.\"\n\n2) The CPU fallback is technically possible but impractically slow, killing the iterate-to-indistinguishable loop. Reported inference alone is ~0.526 s/token on an M4 CPU vs 0.014 s on a 4090 (~37x slower); the full pipeline requires training TWO stages (the AR/GPT model + the SoVITS/VITS decoder) on CPU over 30-60 min of audio, then RVC needs its OWN separate training on top. Each experiment becomes hours-to-days, and you cannot afford the many retraining passes needed to chase a blind-test pass.\n\n3) \"Indistinguishable\" is not on offer. v3/v4 have documented metallic/human-sound artifacts (issue #2409 \"V3 and V4 version human sounds artifacts issue\"); v2Pro is explicitly positioned \"between v2 and v4,\" a robustness/speed tradeoff, not SOTA fidelity. Stacking an RVC pass then layers RVC's own pitch/formant errors and artifacts on top \u2014 two lossy models compounding, not cancelling. That is \"close,\" not \"indistinguishable.\"\n\n4) Licensing is mostly clean but has a redistribution asterisk. GPT-SoVITS code is MIT and RVC code is MIT (good for local + redistributable use). BUT the pipeline depends on pretrained content encoders (HuBERT / ContentVec, RVC's hubert_base.pt, RMVPE) whose weights carry their own upstream terms \u2014 redistributing a bundled, ready-to-run stack is where a non-code license could bite. The code license is not the whole license surface.\n\nNet: even setting aside quality, the mandated path (train on this Mac) forces CPU-only training that the project itself treats as a degraded workaround, over a doubled (GPT-SoVITS + RVC) training surface. A model whose maintainers tell you not to train it the way you're required to train it does not clear the bar.\n\nSources: github.com/RVC-Boss/GPT-SoVITS (README + issues #61/#93/#165/#808/#1342/#2409/#21), deepwiki.com/RVC-Boss/GPT-SoVITS/1.2-model-versions-and-evolution, discuss.pytorch.org Apple-Silicon training-speed threads, github.com/RVC-Project/Retrieval-based-Voice-Conversion (MIT LICENSE).",
+      "local_mac_finetune_realistic": "maybe-leaning-no. It RUNS but does not clear the bar. MPS training is officially degraded (\"significantly lower quality... using CPUs instead\" \u2014 GPT-SoVITS README), so you are pushed to CPU-only training of two stacked models (GPT-SoVITS AR+VITS, then a separate RVC model) over 30-60 min of audio. CPU training is technically feasible but glacially slow (M4 CPU is ~37x slower than a 4090 even at inference), making the many retraining passes needed for an indistinguishable result impractical. So: not disqualified as impossible, but not realistic as a route to a blind-test-passing clone on this hardware.",
+      "strongest_point": "GPT-SoVITS's own README disowns Mac-GPU (MPS) training as producing \"significantly lower quality\" models and falls back to CPU \u2014 the mandated train-on-Apple-Silicon path is one the maintainers themselves refuse to use at quality.",
+      "key_risks": [
+        "MPS training path is officially quality-degraded; maintainers force CPU fallback (README quote)",
+        "CPU-only training of two stacked models over 30-60 min audio is impractically slow (~37x slower than CUDA), gutting the retrain-iterate loop needed for indistinguishability",
+        "v3/v4 have documented metallic/human-voice artifacts (issue #2409); v2Pro is a robustness tradeoff, not SOTA fidelity",
+        "Stacking RVC compounds a second lossy model's pitch/formant artifacts rather than cancelling them, and doubles the training/tuning surface",
+        "Redistribution asterisk: MIT code, but bundled pretrained encoders (HuBERT/ContentVec/RMVPE/hubert_base.pt) carry separate upstream weight terms",
+        "No confirmed community report of a high-quality MPS-trained GPT-SoVITS model; standing advice is 'don't train on Mac'"
+      ]
+    },
+    {
+      "model": "GPT-SoVITS (v2Pro / v2ProPlus / v4)",
+      "position": "champion",
+      "argument": "GPT-SoVITS is the strongest fit among open TTS backends for a fine-tune-on-my-voice, run-it-locally goal, and it clears the license and workflow constraints cleanly. Where I have to be honest is the Apple-Silicon TRAINING path \u2014 it works, but not the fast way.\n\nLICENSE (clears the bar). The repo (RVC-Boss/GPT-SoVITS) is MIT-licensed \u2014 local, redistributable, commercial use allowed (https://github.com/RVC-Boss/GPT-SoVITS/blob/main/LICENSE). Pretrained base weights are on Hugging Face (lj1995/GPT-SoVITS, incl. the v2Pro/v2ProPlus/v4 folders). No paid API, no gated commercial tier for local use. This is a genuine advantage over XTTS-v2 (Coqui's non-commercial CPML license) \u2014 GPT-SoVITS has no such non-commercial clause.\n\nFINE-TUNE, NOT ZERO-SHOT (its native mode). GPT-SoVITS is architecturally a fine-tune pipeline: you separately fine-tune the SoVITS/VITS synthesizer and the GPT (autoregressive) module on your own dataset. The famous \"1 minute\" claim is the FLOOR; 30-60 min of clean owner audio is 30-60x that floor, which is squarely in the regime where speaker identity, timbre and idiolect are captured well. Prosody control is a real strength: synthesis is driven by a chosen reference clip, so you steer emotion/pacing/energy by picking reference audio, and v4 outputs native 48 kHz to kill the muffled/metallic artifacts of v3. v2Pro is documented as surpassing v4's quality at v2's hardware cost. With 30-60 min, near-indistinguishable timbre is a credible target \u2014 the models this family produces routinely fool casual listeners.\n\nLOCAL ON APPLE SILICON, ZERO CUDA (the decisive point \u2014 and I won't oversell it). The official installer has a first-class macOS path with an explicit `--device MPS|CPU` flag (README). Crucially, the fine-tune loop does NOT depend on the CUDA-only libraries that disqualify other repos \u2014 no DeepSpeed, no bitsandbytes, no flash-attn/xformers in the training path \u2014 so it doesn't hard-fail on MPS/CPU the way Tortoise or some LLM-TTS repos do. Inference on Apple Silicon is real and usable: v2ProPlus RTF ~0.526 on an M4 CPU (Issue #2579) \u2014 slower than a 4090's 0.014 but fine for non-streaming generation. So infer-locally-free is solidly YES.\n\nThe honest crux is training QUALITY on Mac GPU. The maintainers' own README states: \"The models trained with GPUs on Macs result in significantly lower quality compared to those trained on other devices, so we are temporarily using CPUs instead.\" So the supported Mac training path is CPU, which completes but is slow; the MPS training path exists but is quality-degraded by the maintainers' own admission (Issue #165 contributor set PYTORCH_ENABLE_MPS_FALLBACK=1; the lead maintainer has publicly said he's not aware of anyone getting good MPS-trained results). That means the champion claim survives as: it WILL train locally on this Mac for free with no CUDA (CPU path, a one-time multi-hour job for a 30-60 min dataset), and infer well \u2014 but \"indistinguishable in a rigorous blind test\" is more assured for a CUDA-trained checkpoint than for a Mac-CPU-trained one, and no one has published a blind-test-passing Mac-trained GPT-SoVITS model.",
+      "strongest_point": "Only backend here that is simultaneously MIT (commercial-OK, unlike XTTS's non-commercial CPML), fine-tune-native (both SoVITS + GPT modules on your data, with 30-60 min being 30-60x the working floor), and free of CUDA-only training deps (no DeepSpeed/bitsandbytes/flash-attn), so it genuinely trains and infers on Apple Silicon with an officially-supported macOS device flag.",
+      "local_mac_finetune_realistic": "maybe (lean yes-with-caveats). Fine-tuning DOES run locally on Apple Silicon: official macOS installer, `--device MPS|CPU` flag, and no CUDA-only libraries in the training loop, so no hard failure. Inference is confirmed usable (v2ProPlus ~0.526 RTF on M4 CPU). BUT the maintainers' own README says Mac-GPU (MPS) training yields \"significantly lower quality\" and therefore defaults training to CPU \u2014 which completes but is slow (multi-hour for 30-60 min of audio) and is a one-time cost. No published blind-test-passing Mac-trained checkpoint exists. So: reliably trainable+free+CUDA-free on this Mac = yes; \"indistinguishable-in-blind-test quality from the Mac-trained result specifically\" = unproven, the main honest risk.",
+      "key_risks": [
+        "MPS training is explicitly quality-degraded per the maintainers' own README; supported Mac training path is CPU, so you trade speed (multi-hour fine-tunes) for quality parity.",
+        "No published, rigorously blind-tested voice model trained end-to-end on Apple Silicon \u2014 the 'indistinguishable' claim is validated mainly on CUDA-trained checkpoints, not Mac-trained ones.",
+        "Documented inference-time memory leak on the Mac webUI (Issue #165) requiring UI restarts to free memory \u2014 a practical usability drag.",
+        "Preprocessing stages (UVR5 vocal separation, ASR transcription) run CPU-only on Mac, adding wall-clock time to dataset prep.",
+        "Speaker similarity is reference-clip-dependent at inference: getting truly indistinguishable prosody requires curating good reference clips, not just the fine-tune.",
+        "Base pretrained weights (lj1995 on HF) should be license-checked for redistribution even though the code is MIT; the model weights' terms are separate from the repo license."
+      ]
+    },
+    {
+      "model": "Chatterbox (Resemble AI, 0.5B)",
+      "position": "skeptic",
+      "argument": "Chatterbox fails the decisive constraint: there is no demonstrated CUDA-free fine-tuning path on Apple Silicon. The split is stark and consistent across the ecosystem \u2014 inference has been ported to Mac, but training has not.\n\n1. FINE-TUNING IS CUDA-ONLY (disqualifying). Every real fine-tuning fork targets NVIDIA. The most-referenced one, davidbrowne17/chatterbox-streaming (lora.py), states outright: \"You will need a CUDA gpu with at least 18gb of vram.\" gokhaneraslan/chatterbox-finetuning and stlohrey/chatterbox-finetuning are the same story \u2014 GPU-recommended, CUDA-OOM troubleshooting, LoRA to cut VRAM. NONE of them mention MPS or CPU training. Resemble ships NO official fine-tuning script at all (issues #239, #329 are open requests), so you're betting on community LoRA code that was written and tested only against CUDA.\n\n2. THE APPLE-SILICON WORK IS INFERENCE-ONLY. Jimmi42/chatterbox-tts-apple-silicon, lorenjphillips/chatterbox-mac-silicon, and devnen/Chatterbox-TTS-Server all adapt Chatterbox for *generation* on M-series \u2014 voice cloning at inference, not training. Not one of them fine-tunes on MPS. Conflating \"runs on my Mac\" (zero-shot inference) with \"trains on my Mac\" (fine-tuning) is exactly the trap the constraint warns about.\n\n3. MPS BREAKS THE TRAINING LOOP AT THE DTYPE LEVEL. MPS does not support float64: \"Cannot convert a MPS Tensor to float64 dtype as the MPS framework doesn't support float64. Please use float32 instead.\" The base model was built CUDA-first (issue #357: \"Chatterbox doesn't work on Apple silicon due to the lack of CUDA\"), and even the inference forks report MPS tensor-allocation errors severe enough that they \"automatically detect Apple Silicon and use CPU mode for maximum stability.\" If inference itself falls back to CPU on some ops, an untested backward pass on MPS is a coin-flip at best. The 18GB figure is CUDA-VRAM; on a Mac that's unified memory shared with the OS, and CPU-fallback training of a 0.5B model on 30-60 min of audio would be punishingly slow even if it didn't crash.\n\n4. \"INDISTINGUISHABLE\" IS UNPROVEN. Chatterbox is a 0.5B zero-shot cloner \u2014 genuinely good similarity, but the marketing (\"open-source ElevenLabs killer\") is not a blind-test result. There is no published MOS/ABX evidence that a LoRA fine-tune on ~45 min of one speaker reaches indistinguishable-from-real, and prosody/emotion control is knob-driven, not learned-per-speaker. \"Close\" is likely; \"fools a blind test\" is speculative.\n\n5. WATERMARK CAVEAT. Every generation is stamped with Resemble's Perth neural watermark. It's imperceptible so it won't fail a listening test, but it is a mandatory, non-optional artifact embedded in all redistributed audio \u2014 worth knowing for a provenance-sensitive owner.\n\nLicense is genuinely fine (MIT, weights open on HF, redistributable). That's the one hard constraint Chatterbox clearly passes. But license is the easy bar. The champion must produce ACTUAL EVIDENCE \u2014 a GitHub issue, a repo, a reproducible report \u2014 of a full fine-tune completing on M-series MPS or CPU. Absent that, Chatterbox is a beautiful inference model that cannot train on this Mac, and per the constraints that is disqualifying.",
+      "local_mac_finetune_realistic": "no \u2014 Inference on Apple Silicon is real and works (with CPU fallback on some MPS ops). But FINE-TUNING is the constraint, and there is zero evidence of it succeeding CUDA-free. All three fine-tuning forks require an ~18GB CUDA GPU; none mention MPS/CPU training. MPS lacks float64 (breaks the training loop), the base model is CUDA-first, and even inference sometimes drops to CPU for stability. No GitHub issue, repo, or community report shows a completed fine-tune on M-series. Until the champion produces a reproducible MPS/CPU training run, treat local Mac fine-tuning as not demonstrated \u2192 disqualifying.",
+      "strongest_point": "The only fine-tuning code that exists for Chatterbox is CUDA-only (davidbrowne17's lora.py: \"CUDA gpu with at least 18gb of vram\"); every Apple-Silicon port is inference-only, and MPS can't even hold float64, so no one has shown a fine-tune completing on a Mac without a GPU.",
+      "key_risks": [
+        "Fine-tuning may simply not run on MPS/CPU: no repo or issue demonstrates a completed Apple-Silicon training run, and MPS lacks float64 which the training loop can hit.",
+        "All fine-tuning forks assume ~18GB CUDA VRAM; on unified-memory Macs a CPU-fallback fine-tune of a 0.5B model would be extremely slow or OOM if it works at all.",
+        "Fine-tuning is community-maintained (davidbrowne17, gokhaneraslan, stlohrey), not official Resemble \u2014 breakage, drift, and no support guarantee.",
+        "'Indistinguishable in a blind test' is unproven: no published MOS/ABX for a single-speaker LoRA on 30-60 min; emotion/prosody is knob-driven, not learned per speaker.",
+        "Every output carries the mandatory imperceptible Perth watermark \u2014 not a listening-test problem, but a non-removable artifact in all redistributed audio.",
+        "Inference itself reportedly falls back to CPU on some MPS ops 'for stability,' signalling the MPS path is fragile even before adding a backward pass."
+      ]
+    },
+    {
+      "model": "GPT-SoVITS (v2Pro / v4)",
+      "position": "skeptic",
+      "argument": "GPT-SoVITS fails the decisive requirement \u2014 real fine-tuning on Apple Silicon \u2014 on the maintainers' OWN testimony, not a third-party guess.\n\n1) MPS training is admitted-broken, disabled by the project itself. The official README (RVC-Boss/GPT-SoVITS, main) states verbatim: \"The models trained with GPUs on Macs result in significantly lower quality compared to those trained on other devices, so we are temporarily using CPUs instead.\" So the one hardware-accelerated path on an M-series Mac (MPS) is not \"supported\" \u2014 the maintainers deliberately route Mac training to CPU because MPS output is degraded. A README claim of MPS support does NOT translate to usable fine-tuning; the install flag `--device <MPS|CPU>` exists but the docs steer you to CPU. Issue #61 shows the historical failure mode: `AssertionError: Torch not compiled with CUDA enabled` in the training/formatting path, i.e. CUDA assumptions baked into the pipeline. Every \"tested\" macOS environment listed in the README (PyTorch 2.5.1 / 2.7.0 on Apple silicon) is framed around preprocessing + inference, not training. There is no documented, reproduced full fine-tune on Apple Silicon that hits good quality.\n\n2) The only remaining path (CPU training) is impractically slow AND the project trains TWO models. GPT-SoVITS fine-tunes both the SoVITS/VITS module and the GPT (AR) module. On an RTX 3060 that's a few minutes for ~1 min of audio; on an M-series CPU it is orders of magnitude slower, and the owner's target is 30\u201360 min of audio (far past the \"1-minute\" hero-demo regime), multiplying the pain. \"Slow but works for occasional tests\" is not \"trains a blind-test-indistinguishable model.\"\n\n3) Even if you get it to train, the quality bar is not met, especially for English. The developer's own similarity claim is \"80\u201395%\" \u2014 that is audibly close, i.e. explicitly NOT indistinguishable. Known weak spots compound this: (a) it is Chinese-optimized and \"some noise artifacts remain in non-Chinese outputs\" \u2014 the owner presumably wants English; (b) the highest-quality versions v3/v4 \"cannot\" deliver on average-quality training sets and their timbre \"leans toward the reference audio rather than the overall training set,\" so consistency across a 30\u201360 min corpus is not guaranteed; (c) v3 shipped a metallic upsampling artifact (v4 claims a fix, but this shows the quality track record is bumpy). v2Pro is pitched as \"v4-level at v2 cost,\" but that marketing is measured on CUDA hardware, not CPU-trained Mac models whose quality the maintainers already flagged as degraded.\n\nNet: the champion must produce a reproduced, non-CUDA, Apple-Silicon fine-tune (ideally MPS, or CPU with acceptable wall-clock) that a blind listener cannot separate from the real English voice. Absent that evidence, the project's own README disqualifies it against the hard constraint.",
+      "local_mac_finetune_realistic": "no (at best \"maybe, CPU-only, sub-bar\"). MPS fine-tuning is effectively disqualified by the maintainers themselves: the README says Mac GPU-trained models are \"significantly lower quality\" so they force CPU. CPU fine-tuning is technically possible but slow, and it trains two models over 30\u201360 min of audio; more importantly nobody has published a reproduced Apple-Silicon fine-tune reaching blind-test-indistinguishable quality \u2014 and English (non-Chinese) output carries known residual artifacts. So the DECISIVE requirement is unproven-to-failing on current evidence.",
+      "key_risks": [
+        "MPS training is disabled by maintainers for producing degraded quality \u2014 README explicitly falls back to CPU; 'MPS support' in install flags is misleading",
+        "CPU-only training on M-series is slow and trains two models (SoVITS + GPT); no reproduced Apple-Silicon fine-tune at good quality is documented",
+        "CUDA assumptions historically leak into the training/formatting pipeline (Torch-not-compiled-with-CUDA errors), risking silent GPU dependence",
+        "Chinese-optimized model: English/non-Chinese outputs retain noise artifacts \u2014 bad fit if the owner's voice is English",
+        "Developer's own similarity claim is 80\u201395% = 'close', not indistinguishable; blind-test bar likely unmet",
+        "v3/v4 (highest quality) need high-quality training data, lean toward reference over training set, and had a metallic-artifact regression in v3 \u2014 quality track record is uneven",
+        "Pretrained-weight licensing (the real engine behind few-shot) is less clearly stated than the MIT code license and should be verified before redistributable use"
+      ],
+      "strongest_point": "The project's own README disqualifies it against the hard constraint: \"The models trained with GPUs on Macs result in significantly lower quality compared to those trained on other devices, so we are temporarily using CPUs instead.\" MPS fine-tuning \u2014 the decisive requirement \u2014 fails on the maintainers' own testimony, leaving only slow CPU training with no published proof of blind-test-indistinguishable results on Apple Silicon."
+    },
+    {
+      "model": "GPT-SoVITS (v2Pro / v4) + RVC conversion pass (stacked)",
+      "position": "champion",
+      "argument": "THE CASE. This stack is the strongest FOSS route to a blind-test-indistinguishable local clone of the owner's voice, and \u2014 critically \u2014 it is the rare high-similarity pipeline that actually FINE-TUNES and RUNS on an Apple-Silicon Mac with zero CUDA, zero cloud, zero paid API.\n\n1) LICENSE \u2014 clean pass. GPT-SoVITS code is MIT (github.com/RVC-Boss/GPT-SoVITS). The pretrained weights (huggingface.co/lj1995/GPT-SoVITS) are labelled MIT. RVC WebUI (github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI) is MIT. Everything is downloadable, local, and redistributable. No gated weights, no non-commercial clause on the core. (Verify the weight card at download time, but MIT is what the repos advertise.)\n\n2) FINE-TUNE, not zero-shot \u2014 this is its native mode. GPT-SoVITS is purpose-built for few-shot FINE-TUNING: its own headline is \"1 min voice data can train a good TTS model.\" The owner's 30\u201360 min is 30\u201360x that floor \u2014 a luxurious dataset. Fine-tune is two real training stages: SoVITS (VITS decoder \u2192 timbre) + GPT (autoregressive text\u2192semantic \u2192 prosody/rhythm). v3/v4/v2Pro explicitly raise timbre similarity; v4 natively outputs 48kHz and removes v3's metallic artifacts; v2Pro matches/exceeds v4 quality at v2's cost/speed. Then you STACK an RVC model \u2014 separately fine-tuned on the same voice \u2014 as a frame-level timbre-conversion pass on the TTS output. RVC's whole reputation is extremely high same-speaker similarity in conversion. Division of labour: GPT-SoVITS supplies natural prosody + text controllability; RVC pins the timbre to the target and scrubs residual speaker leakage. That second pass is exactly what buys the last few percent needed to cross the blind-test line.\n\n3) TRAINS AND INFERS ON APPLE SILICON \u2014 the decisive question, answered honestly. INFERENCE: officially MPS-supported (README lists PyTorch 2.7.0 on Apple silicon as a tested env); an MLX RVC port runs 8.71x faster than PyTorch-MPS. TRAINING: the official README states Mac GPU/MPS training gives \"significantly lower quality... so we are temporarily using CPUs instead.\" Read correctly, that is a GREEN light, not red: Mac fine-tuning is officially supported through the CPU path, and CPU is chosen precisely because it yields GOOD quality (MPS is disabled for a quality bug, not a capability gap). The installer offers MPS|CPU. RVC training on Apple Silicon is independently confirmed: issue #767 shows a real M1 MacBook Pro completing training on a 30-min dataset (~6h). Decisively, none of these few-shot fine-tune loops require CUDA-only ops \u2014 no DeepSpeed, no bitsandbytes, no flash-attn, no xformers \u2014 which is exactly WHY the plain CPU path trains to completion on a Mac. Nothing here is disqualified by the \"can't train on this Mac\" test.\n\n4) PROSODY CONTROL \u2014 a genuine strength. The GPT (AR) stage models rhythm/emotion natively, and inference is conditioned on a reference clip, so you steer emotion/pace/energy by swapping reference audio \u2014 real prosody control, not a flat monotone. This is where it beats pure-VITS and most zero-shot stacks.\n\nNET: with 30\u201360 min of clean same-language audio, in-domain phrases, GPT-SoVITS v4/v2Pro fine-tune + an RVC conversion pass is a credible path to blind-test indistinguishability, entirely free and entirely local on the Mac.",
+      "local_mac_finetune_realistic": "YES \u2014 with an honest asterisk on SPEED, not capability. Both stages genuinely fine-tune on Apple Silicon with no CUDA/cloud: GPT-SoVITS's own README routes Mac training through the CPU path (and picks CPU over MPS for QUALITY, not because training fails), and RVC training on an M1 is independently confirmed completing a 30-min dataset (issue #767, ~6h). The reason it works where LLM fine-tunes choke is that these loops need NO CUDA-only deps (no DeepSpeed/bitsandbytes/flash-attn/xformers). The real cost is wall-clock: training is CPU-bound (MPS accelerates only inference), so expect multi-hour fine-tune runs and painful iteration \u2014 but it runs to completion and produces high quality. That clears the hard constraint. It is 'yes', not 'maybe', because the dataset is tiny (few-shot), the required compute fits CPU, and there is documented evidence of completed local training for both components.",
+      "strongest_point": "It is the only high-similarity FOSS voice stack that BOTH fine-tunes locally on Apple-Silicon with zero CUDA-only dependencies (official CPU training path + confirmed M1 RVC training in issue #767) AND stacks two independently-trained speaker models (GPT-SoVITS timbre+prosody, then RVC frame-level timbre lock) to reach blind-test-grade similarity \u2014 all under MIT.",
+      "key_risks": [
+        "CPU-bound training: MPS is disabled for training (quality bug), so fine-tuning runs on CPU only \u2014 multi-hour runs (RVC ~6h for 30min on M1 per issue #767) and slow, painful iteration.",
+        "Stacking doubles the training + failure surface: an RVC pass can over-convert and inject artifacts or muffle prosody, sometimes HURTING naturalness \u2014 it must be tuned (index ratio, protect) or it backfires.",
+        "'Indistinguishable' holds mainly for in-domain, clean, same-language, short-to-medium utterances; long-form, code-switching, or out-of-distribution prosody will crack the illusion.",
+        "MPS-training being off means no GPU acceleration headroom on Mac \u2014 you cannot brute-force more steps cheaply; you are stuck at CPU throughput.",
+        "Weight-license must be verified at download (community HF mirrors label MIT, but the base models were trained on large corpora); low risk for a personal local project, non-zero for redistribution.",
+        "Two toolchains (GPT-SoVITS + RVC) with separate Python/PyTorch env pins on macOS add real setup/maintenance fragility vs a single-model solution."
+      ]
+    },
+    {
+      "model": "Chatterbox (Resemble AI, 0.5B Llama-backbone TTS)",
+      "position": "champion",
+      "argument": "Chatterbox is the strongest honest pick for a local, free, fine-tunable ChinAI voice. LICENSE: base repo resemble-ai/chatterbox is MIT (redistributable, commercial-OK); fine-tune toolkits are MIT (stlohrey, davidbrowne17) and Apache-2.0 (gokhaneraslan). No gated weights, no non-commercial clause. Perth watermark is embedded in outputs (imperceptible; does not affect blind-test indistinguishability).\n\nWHY IT CAN GET INDISTINGUISHABLE: it already does strong zero-shot cloning from a 6s reference; fine-tuning on 30-60 min locks the owner's timbre, cadence and idiolect rather than approximating it. The 0.5B Llama T3 stage is what you train; the S3Gen flow-matching vocoder + voice encoder stay frozen, so you are adapting a standard HF Llama transformer \u2014 the best-understood thing to fine-tune. Two real prosody dials (exaggeration, cfg_weight) give genuine expressive control at inference, so you tune identity once and steer delivery per-utterance.\n\nTHE DECISIVE QUESTION (train+infer on Apple Silicon, no CUDA): verified in source, not README claims. Base pyproject and ALL THREE finetune toolkits contain ZERO CUDA-only dependencies \u2014 no bitsandbytes, DeepSpeed, flash-attn, or xformers; just torch 2.6 + transformers (+ peft for LoRA). stlohrey/finetune_t3.py drives full T3 fine-tune through HuggingFace Trainer, which auto-detects and runs on MPS; it loads on cpu and lets Trainer place the model. gokhaneraslan uses peft==0.17.1 LoRA (Apache-2.0, updated 2026-06), explicitly recommending LoRA for <10h datasets \u2014 the 30-60 min case \u2014 and LoRA on a Llama backbone runs on MPS in ~16GB unified RAM. davidbrowne17 guards every CUDA-specific op (autocast/GradScaler/pin_memory) behind if DEVICE=='cuda' and ships example_for_mac.py. MPS inference is well-proven (multiple Apple-Silicon ports, 2-3x over CPU).",
+      "local_mac_finetune_realistic": "yes, with a documented caveat \u2014 it is feasible, not turnkey. Feasible because the hard blockers are absent: no toolkit depends on bitsandbytes/DeepSpeed/flash-attn/xformers, the trainable part is a standard HF Llama transformer, and both training paths (HF Trainer, peft LoRA) support MPS; MPS inference is already proven. Recommended route: gokhaneraslan peft-LoRA path on an M-series Mac (>=16GB), fp32 or partial-bf16 (NOT fp16 \u2014 MPS autocast/GradScaler are CUDA-only), PYTORCH_ENABLE_MPS_FALLBACK=1 for the odd unsupported op. Caveats that keep this from a clean 'turnkey yes': (1) no repo advertises a *tested* MPS training run \u2014 example_for_mac.py is inference-only, so expect a one-line device patch (add 'mps' to the cuda/cpu ternary; skip the hardcoded whisper device=cuda auto-transcribe by pre-transcribing); (2) fp32 training of even a LoRA over a 0.5B backbone on MPS is slow \u2014 plan hours per run and memory pressure, full fine-tune wants ~24GB; (3) 'indistinguishable in a blind test' is the honest ceiling, not a guarantee \u2014 30-60 min plus LoRA reliably reaches high speaker-similarity/naturalness, but occasional artifacts and prosody misses are likely without iteration on data quality (clean 24k mono, VAD-trimmed).",
+      "strongest_point": "Verified in source that neither the base package nor any of the three fine-tuning toolkits pull a single CUDA-only dependency (no bitsandbytes/DeepSpeed/flash-attn/xformers) \u2014 the trainable component is a plain HuggingFace Llama transformer trained via HF Trainer or peft-LoRA, both of which run on MPS, so the usual reason 'it won't train on a Mac' simply does not apply here.",
+      "key_risks": [
+        "No fine-tune repo ships a *tested* MPS training path; example_for_mac.py is inference-only, so a small device patch (add 'mps', disable fp16/GradScaler, pre-transcribe to avoid hardcoded whisper device=cuda) is required before training starts.",
+        "fp16 autocast + GradScaler are CUDA-only; on MPS you must train fp32 or partial-bf16 (torch 2.6 MPS bf16 is incomplete), which is slower and heavier on unified memory.",
+        "MPS training speed/memory: hours per run for LoRA on a 0.5B backbone; full fine-tune realistically wants ~24GB unified RAM, and some ops may CPU-fallback (PYTORCH_ENABLE_MPS_FALLBACK) further slowing it.",
+        "'Indistinguishable in a blind test' is the aspiration, not a floor \u2014 outcome depends heavily on clean, VAD-trimmed 24k data and iteration; expect occasional artifacts/prosody misses.",
+        "All outputs carry Resemble's Perth watermark (imperceptible to humans, so not a blind-test problem, but present and worth disclosing).",
+        "Every fine-tune toolkit is a third-party community repo (105-291 stars), not Resemble-maintained \u2014 durability and future compatibility are on you to pin (torch 2.6 / transformers 4.46.3)."
+      ]
+    }
+  ]
+}
