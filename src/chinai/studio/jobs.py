@@ -188,6 +188,7 @@ class JobManager:
             reference_wav=voice.reference_wav,
             out_path=out_path,
             progress=on_progress,
+            lora_path=voice.lora_path,
             **job.params,
         )
 
