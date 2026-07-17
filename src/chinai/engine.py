@@ -52,6 +52,11 @@ class ChinaiEngine:
         self._requested_device = device
         self._device: str | None = None
         self._model = None
+        # LoRA adapter state. The base model is loaded once and shared across
+        # jobs, so we track whether an adapter has been injected and which one is
+        # currently loaded, to swap/disable it per voice without reloading.
+        self._lora_injected = False
+        self._loaded_lora: Path | None = None
 
     @property
     def device(self) -> str:
@@ -73,6 +78,48 @@ class ChinaiEngine:
         self._model = ChatterboxTTS.from_pretrained(device=self.device)
         return self._model
 
+    def _set_adapter_enabled(self, tfmr, enabled: bool) -> None:
+        """Enable or disable every injected LoRA layer on `tfmr`."""
+        from peft.tuners.tuners_utils import BaseTunerLayer
+
+        for module in tfmr.modules():
+            if isinstance(module, BaseTunerLayer):
+                module.enable_adapters(enabled)
+
+    def _apply_lora(self, lora_path: Path | None) -> None:
+        """Attach, swap, or disable a fine-tuned LoRA adapter on the T3 backbone.
+
+        The base model is shared across voices, so this keeps the injected
+        adapter in sync with the requested voice: disabled when `lora_path` is
+        None (zero-shot), injected once and (re)loaded when a path is given.
+        """
+        if lora_path is None:
+            if self._lora_injected:
+                self._set_adapter_enabled(self._model.t3.tfmr, False)
+                self._loaded_lora = None
+            return
+
+        lora_path = Path(lora_path)
+        if not lora_path.is_file():
+            raise ValueError(f"LoRA adapter not found: {lora_path}")
+
+        import torch
+        from peft import inject_adapter_in_model, set_peft_model_state_dict
+
+        from chinai.finetune import build_lora_config
+
+        tfmr = self._model.t3.tfmr
+        if not self._lora_injected:
+            # Inject IN PLACE so t3.tfmr stays a LlamaModel and Chatterbox's
+            # custom inference backend keeps working (matches training).
+            inject_adapter_in_model(build_lora_config(), tfmr)
+            self._lora_injected = True
+        self._set_adapter_enabled(tfmr, True)
+        if self._loaded_lora != lora_path:
+            state = torch.load(str(lora_path), map_location=self.device)
+            set_peft_model_state_dict(tfmr, state)
+            self._loaded_lora = lora_path
+
     def synthesize(
         self,
         script: str,
@@ -84,14 +131,22 @@ class ChinaiEngine:
         max_chars: int = DEFAULT_MAX_CHARS,
         seed: int | None = None,
         progress: Callable[[int, int, str], None] | None = None,
+        lora_path: Path | None = None,
     ) -> SynthesisReport:
         """Synthesize `script` in the voice from `reference_wav`, writing `out_path`.
 
         `progress`, when given, is called at the start of each chunk with
         (chunk_index_1based, chunk_count, chunk_text).
 
+        `lora_path`, when given, is a fine-tuned LoRA adapter (voices/<name>/
+        lora.pt) injected into the T3 backbone before generation; when omitted,
+        synthesis is plain zero-shot and any previously loaded adapter is
+        disabled. This trailing optional argument keeps every existing caller
+        working unchanged.
+
         Raises:
-            ValueError: if `reference_wav` does not exist, or `script` is empty.
+            ValueError: if `reference_wav` or `lora_path` does not exist, or
+                `script` is empty.
         """
         import torch
         import torchaudio
@@ -106,6 +161,7 @@ class ChinaiEngine:
             torch.manual_seed(seed)
 
         model = self._load_model()
+        self._apply_lora(lora_path)
         model.prepare_conditionals(str(reference_wav), exaggeration=exaggeration)
 
         start_time = time.monotonic()

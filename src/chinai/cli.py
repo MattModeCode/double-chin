@@ -14,7 +14,7 @@ from chinai.engine import DEFAULT_CFG_WEIGHT, DEFAULT_EXAGGERATION, DEFAULT_TEMP
 # Commands that actually touch chinai_home(); migration only needs to run
 # ahead of these, so `chinai verify` (arbitrary wav files, no storage) and
 # argparse-level exits (--help, unknown/missing command) never trigger it.
-_STORAGE_COMMANDS = frozenset({"enroll", "say", "voices", "doctor", "studio", "app"})
+_STORAGE_COMMANDS = frozenset({"enroll", "say", "train", "voices", "doctor", "studio", "app"})
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -57,6 +57,26 @@ def build_parser() -> argparse.ArgumentParser:
     say_parser.add_argument("--temperature", type=float, default=DEFAULT_TEMPERATURE)
     say_parser.add_argument("--seed", type=int, default=None)
     say_parser.add_argument("--device", default=None, help="Force a device (mps/cuda/cpu).")
+
+    train_parser = subparsers.add_parser(
+        "train",
+        help="Fine-tune a LoRA voice adapter for an enrolled voice on your recordings.",
+    )
+    train_parser.add_argument("name", help="Name of an already-enrolled voice.")
+    train_parser.add_argument(
+        "recordings_dir", type=Path,
+        help="Directory of recordings named NNN.{wav,m4a,mp3,flac} matching the manifest.",
+    )
+    train_parser.add_argument(
+        "--manifest", type=Path, default=None,
+        help="Path to manifest.tsv (default: <recordings_dir>/manifest.tsv).",
+    )
+    train_parser.add_argument("--epochs", type=int, default=5, help="Passes over the training set.")
+    train_parser.add_argument(
+        "--max-steps", type=int, default=None,
+        help="Cap total optimizer steps (overrides --epochs when set).",
+    )
+    train_parser.add_argument("--device", default=None, help="Force a device (mps/cpu).")
 
     subparsers.add_parser("voices", help="List enrolled voices.")
 
@@ -110,8 +130,10 @@ def _cmd_say(args: argparse.Namespace) -> int:
     if args.voice:
         voice = get_voice(args.voice)
         reference_wav = voice.reference_wav
+        lora_path = voice.lora_path
     else:
         reference_wav = args.ref
+        lora_path = None
         if not reference_wav.is_file():
             raise ValueError(f"reference wav not found: {reference_wav}")
 
@@ -124,7 +146,10 @@ def _cmd_say(args: argparse.Namespace) -> int:
         cfg_weight=args.cfg,
         temperature=args.temperature,
         seed=args.seed,
+        lora_path=lora_path,
     )
+    if lora_path is not None:
+        print(f"Using fine-tuned adapter: {lora_path}")
 
     print(
         f"Wrote {report.out_path} ({report.audio_seconds:.1f}s audio, "
@@ -145,6 +170,28 @@ def _cmd_say(args: argparse.Namespace) -> int:
         score = similarity(compare_wav, report.out_path)
         print(f"Speaker similarity vs {label}: {score:.3f} ({verdict(score)})")
 
+    return 0
+
+
+def _cmd_train(args: argparse.Namespace) -> int:
+    from chinai.finetune.train import finetune_voice
+
+    def on_progress(step: int, total: int, loss: float) -> None:
+        if step == 1 or step == total or step % 5 == 0:
+            print(f"step {step}/{total}  loss={loss:.4f}", file=sys.stderr)
+
+    print(f"Fine-tuning voice '{args.name}' on {args.recordings_dir} ...", file=sys.stderr)
+    adapter_path = finetune_voice(
+        args.name,
+        args.recordings_dir,
+        manifest_path=args.manifest,
+        epochs=args.epochs,
+        max_steps=args.max_steps,
+        device=args.device,
+        progress=on_progress,
+    )
+    print(f"Fine-tuned voice '{args.name}'. Adapter saved to {adapter_path}")
+    print(f"Synthesize with it: chinai say \"Hello.\" --voice {args.name}")
     return 0
 
 
@@ -270,6 +317,7 @@ def _cmd_app(args: argparse.Namespace) -> int:
 _HANDLERS = {
     "enroll": _cmd_enroll,
     "say": _cmd_say,
+    "train": _cmd_train,
     "voices": _cmd_voices,
     "verify": _cmd_verify,
     "doctor": _cmd_doctor,

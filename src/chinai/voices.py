@@ -36,6 +36,9 @@ class VoiceInfo:
     duration_seconds: float
     sample_rate: int
     holdout_file: str | None = None
+    # True once a LoRA adapter has been fine-tuned for this voice (train.py).
+    # Older meta.json files predate the field and default to False.
+    finetuned: bool = False
 
     @property
     def reference_wav(self) -> Path:
@@ -45,6 +48,17 @@ class VoiceInfo:
     def holdout_wav(self) -> Path | None:
         path = voices_dir() / self.name / "holdout.wav"
         return path if path.is_file() else None
+
+    @property
+    def lora_path(self) -> Path | None:
+        """The fine-tuned LoRA adapter for this voice, if one exists.
+
+        Note: the 20 s MAX_REFERENCE_SECONDS cap only bounds `reference.wav`
+        (the zero-shot conditioning clip). Fine-tuning reads the full-length
+        recordings directly, so that cap never limits the training data.
+        """
+        path = voices_dir() / self.name / "lora.pt"
+        return path if (self.finetuned and path.is_file()) else None
 
 
 def _validate_name(name: str) -> None:
@@ -263,6 +277,24 @@ def get_voice(name: str) -> VoiceInfo:
             f"no voice named '{name}' is enrolled. "
             f"Available voices: {available_text}"
         )
+    return _load_meta(meta_path)
+
+
+def set_finetuned(name: str, finetuned: bool = True) -> VoiceInfo:
+    """Flag an enrolled voice as fine-tuned (or not) in its meta.json.
+
+    Called by the fine-tune pipeline after saving `voices/<name>/lora.pt` so the
+    engine picks the adapter up via `VoiceInfo.lora_path`.
+
+    Raises:
+        ValueError: if no voice with that name is enrolled.
+    """
+    meta_path = voices_dir() / name / "meta.json"
+    if not meta_path.is_file():
+        raise ValueError(f"no voice named '{name}' is enrolled.")
+    data = json.loads(meta_path.read_text())
+    data["finetuned"] = finetuned
+    meta_path.write_text(json.dumps(data, indent=2))
     return _load_meta(meta_path)
 
 
