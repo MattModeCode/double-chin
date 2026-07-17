@@ -23,9 +23,9 @@ just cosine); `pytest -m "not slow"` green + new `CHINAI_E2E=1` e2e passes; ship
 | G1 | Phase 0 — research fan-out (12 models, 6 researchers) | Workflow team | DONE | 1 | seed: StyleTTS2, GPT-SoVITS, XTTS-v2, F5-TTS, Fish/OpenAudio, IndexTTS-2, CosyVoice2, Llasa, VibeVoice, Chatterbox-finetune, RVC, so-vits-svc |
 | G2 | Phase 1 — judge tournament + decision record | Workflow judges + LEAD | DONE | 1 | criteria: indistinguishability ≫ prosody > proven-local-Mac > latency > risk |
 | G3 | Phase 1b — Chatterbox MPS fine-tune smoke-train (the gate) | LEAD | **PASS** | 2 | MPS LoRA trains: loss 3.53->0.03/60 steps, ~0.2s/step, adapter save+reload+generate OK. Primary decision validated; GPT-SoVITS fallback NOT triggered. Script: scripts/finetune_chatterbox_smoke.py |
-| G4 | Phase 2 — recording-script kit (79 takes, ~48 min) DONE; ingest/train pipeline pending | team | PARTIAL | 1 | recording-scripts/ + manifest.tsv shipped; pipeline = G6 |
+| G4 | Phase 2 — recording kit + ingest/train pipeline | team | DONE | 2 | kit + finetune/dataset.py ingest of manifest.tsv+NNN audio |
 | G5 | Phase 2 — HUMAN HAND-OFF: scripts delivered to owner | LEAD | DELIVERED | 1 | recording-scripts/README.md; awaiting owner audio (non-blocking) |
-| G6 | Phase 3 — engine swap behind existing interface (engine.py, voices.py, config cap) | team | TODO | 0 | preserve synthesize() signature + progress callback |
+| G6 | Phase 3 — finetune pipeline + LoRA-aware engine integration | team | DONE | 1 | src/chinai/finetune/; `chinai train`; engine lora_path kwarg; 63 tests green |
 | G7 | Phase 3 — prosody/style controls through engine→JobRequest→Studio UI→CLI | team | TODO | 0 | levers.md as spec |
 | G8 | Phase 4 — indistinguishability suite (ABX/EER/MOS/prosody) + numeric gate + e2e | team | TODO | 0 | reuse demo/quiz pairs |
 | G9 | Phase 5 — integrate Studio+CLI+desktop, docs, recap, red-team, ship PR | LEAD | TODO | 0 | auto-ship |
@@ -51,7 +51,7 @@ just cosine); `pytest -m "not slow"` green + new `CHINAI_E2E=1` e2e passes; ship
 - G2 attempt 1: decision synthesized by lead from recovered cache → .goal/decision.md.
 - G3 attempt 1: NEXT — set up Chatterbox fine-tune env + MPS device patch + short smoke-train.
 
-HEARTBEAT: 2026-07-17T23:20:00Z G3 PASS (MPS fine-tune proven). Building G6 pipeline+engine integration.
+HEARTBEAT: 2026-07-17T23:35:00Z G6 DONE (finetune backend integrated, 63 tests green). Next: G7 prosody controls.
 
 
 ## RESUME NOTE (2026-07-17T22:50Z — session usage limit, resets 7pm America/Toronto)
