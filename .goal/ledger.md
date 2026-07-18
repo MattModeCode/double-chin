@@ -28,7 +28,7 @@ just cosine); `pytest -m "not slow"` green + new `CHINAI_E2E=1` e2e passes; ship
 | G6 | Phase 3 — finetune pipeline + LoRA-aware engine integration | team | DONE | 1 | src/chinai/finetune/; `chinai train`; engine lora_path kwarg; 63 tests green |
 | G7 | Phase 3 — prosody controls (pause/emphasis markup + rate) | team | DONE | 1 | src/chinai/prosody.py; --rate; UI slider; 89 tests green |
 | G8 | Phase 4 — indistinguishability gate (EER/ABX+naturalness+prosody) | team | DONE | 1 | src/chinai/verification/; `chinai gate`; 107 tests; demo/quiz 0.886 PASS |
-| G9 | Phase 5 — integrate Studio+CLI+desktop, docs, recap, red-team, ship PR | LEAD | TODO | 0 | auto-ship |
+| G9 | Phase 5 — docs updated; open PR (ship) | LEAD | IN PROGRESS | 1 | README+design.md done; pushing branch + PR next |
 
 ## Decisions (append-only)
 - D0 (2026-07-17): Backend boundary = local + free + Apple-Silicon only (owner's call: no
@@ -51,7 +51,7 @@ just cosine); `pytest -m "not slow"` green + new `CHINAI_E2E=1` e2e passes; ship
 - G2 attempt 1: decision synthesized by lead from recovered cache → .goal/decision.md.
 - G3 attempt 1: NEXT — set up Chatterbox fine-tune env + MPS device patch + short smoke-train.
 
-HEARTBEAT: 2026-07-18T00:05:00Z G8 DONE (gate, 107 tests). Next: G9 docs + open PR; then audio-gated pause.
+HEARTBEAT: 2026-07-18T00:20:00Z Docs done; pushing branch + opening PR.
 
 
 ## RESUME NOTE (2026-07-17T22:50Z — session usage limit, resets 7pm America/Toronto)
