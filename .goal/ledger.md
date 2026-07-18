@@ -28,7 +28,7 @@ just cosine); `pytest -m "not slow"` green + new `CHINAI_E2E=1` e2e passes; ship
 | G6 | Phase 3 — finetune pipeline + LoRA-aware engine integration | team | DONE | 1 | src/chinai/finetune/; `chinai train`; engine lora_path kwarg; 63 tests green |
 | G7 | Phase 3 — prosody controls (pause/emphasis markup + rate) | team | DONE | 1 | src/chinai/prosody.py; --rate; UI slider; 89 tests green |
 | G8 | Phase 4 — indistinguishability gate (EER/ABX+naturalness+prosody) | team | DONE | 1 | src/chinai/verification/; `chinai gate`; 107 tests; demo/quiz 0.886 PASS |
-| G9 | Phase 5 — docs updated; open PR (ship) | LEAD | IN PROGRESS | 1 | README+design.md done; pushing branch + PR next |
+| G9 | Phase 5 — docs + ship PR | LEAD | DONE | 1 | PR #2 open: github.com/MattModeCode/ChinAI/pull/2 |
 
 ## Decisions (append-only)
 - D0 (2026-07-17): Backend boundary = local + free + Apple-Silicon only (owner's call: no
@@ -51,7 +51,7 @@ just cosine); `pytest -m "not slow"` green + new `CHINAI_E2E=1` e2e passes; ship
 - G2 attempt 1: decision synthesized by lead from recovered cache → .goal/decision.md.
 - G3 attempt 1: NEXT — set up Chatterbox fine-tune env + MPS device patch + short smoke-train.
 
-HEARTBEAT: 2026-07-18T00:20:00Z Docs done; pushing branch + opening PR.
+HEARTBEAT: 2026-07-18T00:30:00Z SHIPPED PR #2. Paused at the one human dependency: owner's audio -> chinai train -> chinai gate.
 
 
 ## RESUME NOTE (2026-07-17T22:50Z — session usage limit, resets 7pm America/Toronto)
@@ -79,3 +79,14 @@ Load-bearing MPS gotchas for the real fine-tune (from scripts/finetune_chatterbo
 NEXT: G6 build src/chinai/finetune/ (ingest manifest.tsv+NNN.wav -> dataset; train() using the
 above), a `chinai train` CLI command, and engine loads a voice's LoRA adapter if present (else
 zero-shot). Testable now with stand-in voices; real fine-tune runs on owner's audio.
+
+
+## MISSION STATE (2026-07-18T00:30Z) — at the sanctioned audio hand-off
+All work buildable WITHOUT the owner's audio is DONE, tested (107 offline green +
+gated real MPS fine-tune), and shipped as PR #2. Backend fully integrated behind the
+existing engine interface; prosody controls + indistinguishability gate added.
+The ONLY remaining step (the mission's one legitimate pause): owner records
+recording-scripts/001..079 -> `chinai train me <dir> --manifest recording-scripts/manifest.tsv`
+-> `chinai gate me` must clear 0.70. That real fine-tune + gate is G8-final, and it
+needs the owner's real audio which does not exist yet.
+Resume after audio: run `/goal` (or just the 3 commands above).
