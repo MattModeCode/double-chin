@@ -10,11 +10,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from chinai.chunk import DEFAULT_MAX_CHARS, split_script
+from chinai.chunk import DEFAULT_MAX_CHARS
+from chinai.prosody import (
+    EMPHASIS_CFG_WEIGHT_REDUCTION,
+    EMPHASIS_EXAGGERATION_BONUS,
+    compile_script,
+)
 
 DEFAULT_EXAGGERATION = 0.5
 DEFAULT_CFG_WEIGHT = 0.5
 DEFAULT_TEMPERATURE = 0.8
+# Speaking-rate range for the post-synthesis, pitch-preserving time-stretch.
+# 1.0 is unchanged; >1 speeds up, <1 slows down.
+DEFAULT_RATE = 1.0
+MIN_RATE = 0.5
+MAX_RATE = 2.0
 
 
 @dataclass
@@ -52,6 +62,11 @@ class ChinaiEngine:
         self._requested_device = device
         self._device: str | None = None
         self._model = None
+        # LoRA adapter state. The base model is loaded once and shared across
+        # jobs, so we track whether an adapter has been injected and which one is
+        # currently loaded, to swap/disable it per voice without reloading.
+        self._lora_injected = False
+        self._loaded_lora: Path | None = None
 
     @property
     def device(self) -> str:
@@ -73,6 +88,48 @@ class ChinaiEngine:
         self._model = ChatterboxTTS.from_pretrained(device=self.device)
         return self._model
 
+    def _set_adapter_enabled(self, tfmr, enabled: bool) -> None:
+        """Enable or disable every injected LoRA layer on `tfmr`."""
+        from peft.tuners.tuners_utils import BaseTunerLayer
+
+        for module in tfmr.modules():
+            if isinstance(module, BaseTunerLayer):
+                module.enable_adapters(enabled)
+
+    def _apply_lora(self, lora_path: Path | None) -> None:
+        """Attach, swap, or disable a fine-tuned LoRA adapter on the T3 backbone.
+
+        The base model is shared across voices, so this keeps the injected
+        adapter in sync with the requested voice: disabled when `lora_path` is
+        None (zero-shot), injected once and (re)loaded when a path is given.
+        """
+        if lora_path is None:
+            if self._lora_injected:
+                self._set_adapter_enabled(self._model.t3.tfmr, False)
+                self._loaded_lora = None
+            return
+
+        lora_path = Path(lora_path)
+        if not lora_path.is_file():
+            raise ValueError(f"LoRA adapter not found: {lora_path}")
+
+        import torch
+        from peft import inject_adapter_in_model, set_peft_model_state_dict
+
+        from chinai.finetune import build_lora_config
+
+        tfmr = self._model.t3.tfmr
+        if not self._lora_injected:
+            # Inject IN PLACE so t3.tfmr stays a LlamaModel and Chatterbox's
+            # custom inference backend keeps working (matches training).
+            inject_adapter_in_model(build_lora_config(), tfmr)
+            self._lora_injected = True
+        self._set_adapter_enabled(tfmr, True)
+        if self._loaded_lora != lora_path:
+            state = torch.load(str(lora_path), map_location=self.device)
+            set_peft_model_state_dict(tfmr, state)
+            self._loaded_lora = lora_path
+
     def synthesize(
         self,
         script: str,
@@ -84,28 +141,49 @@ class ChinaiEngine:
         max_chars: int = DEFAULT_MAX_CHARS,
         seed: int | None = None,
         progress: Callable[[int, int, str], None] | None = None,
+        lora_path: Path | None = None,
+        rate: float = DEFAULT_RATE,
     ) -> SynthesisReport:
         """Synthesize `script` in the voice from `reference_wav`, writing `out_path`.
 
         `progress`, when given, is called at the start of each chunk with
         (chunk_index_1based, chunk_count, chunk_text).
 
+        `lora_path`, when given, is a fine-tuned LoRA adapter (voices/<name>/
+        lora.pt) injected into the T3 backbone before generation; when omitted,
+        synthesis is plain zero-shot and any previously loaded adapter is
+        disabled. This trailing optional argument keeps every existing caller
+        working unchanged.
+
+        `rate` is a speaking-rate control applied as a pitch-preserving
+        time-stretch to the finished audio (librosa); 1.0 leaves it untouched,
+        >1 speaks faster, <1 slower. Chatterbox has no native rate knob, so
+        this is genuine cadence control layered on top.
+
+        Inline prosody markup in `script` is compiled by `chinai.prosody`:
+        `[pause:N]` / `[break]` become stitched silence, and `*emphasis*` /
+        `[emph]...[/emph]` raise delivery intensity for the spanned chunk.
+
         Raises:
-            ValueError: if `reference_wav` does not exist, or `script` is empty.
+            ValueError: if `reference_wav` or `lora_path` does not exist,
+                `script` is empty, or `rate` is not positive.
         """
         import torch
         import torchaudio
 
         if not reference_wav.is_file():
             raise ValueError(f"reference audio not found: {reference_wav}")
+        if rate <= 0:
+            raise ValueError(f"rate must be positive, got {rate}")
 
-        chunks = split_script(script, max_chars=max_chars)
+        chunks = compile_script(script, max_chars=max_chars)
 
         if seed is not None:
             random.seed(seed)
             torch.manual_seed(seed)
 
         model = self._load_model()
+        self._apply_lora(lora_path)
         model.prepare_conditionals(str(reference_wav), exaggeration=exaggeration)
 
         start_time = time.monotonic()
@@ -117,10 +195,19 @@ class ChinaiEngine:
                 f"chunk {index}/{len(chunks)}: {len(chunk.text)} chars",
                 file=sys.stderr,
             )
+            # An emphasized chunk is delivered hotter: more exaggeration and a
+            # touch less reference adherence, clamped to Chatterbox's ranges.
+            if chunk.emphasis:
+                chunk_exaggeration = min(1.0, exaggeration + EMPHASIS_EXAGGERATION_BONUS)
+                chunk_cfg_weight = max(0.0, cfg_weight - EMPHASIS_CFG_WEIGHT_REDUCTION)
+            else:
+                chunk_exaggeration = exaggeration
+                chunk_cfg_weight = cfg_weight
+
             wav = model.generate(
                 chunk.text,
-                exaggeration=exaggeration,
-                cfg_weight=cfg_weight,
+                exaggeration=chunk_exaggeration,
+                cfg_weight=chunk_cfg_weight,
                 temperature=temperature,
             )
             pieces.append(wav)
@@ -132,6 +219,16 @@ class ChinaiEngine:
 
         audio = torch.cat(pieces, dim=1)
         wall_seconds = time.monotonic() - start_time
+
+        if rate != DEFAULT_RATE:
+            # Pitch-preserving time-stretch on the final mono audio. This is a
+            # real cadence control Chatterbox lacks; the watermark applied at
+            # generation is left intact (we resample, never strip it).
+            import librosa
+
+            samples = audio.detach().cpu().numpy().reshape(-1).astype("float32")
+            stretched = librosa.effects.time_stretch(samples, rate=float(rate))
+            audio = torch.from_numpy(stretched).reshape(1, -1)
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
         torchaudio.save(str(out_path), audio, model.sr)

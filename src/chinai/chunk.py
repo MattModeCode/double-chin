@@ -31,10 +31,16 @@ _TRAILING_WORD_PATTERN = re.compile(r"([A-Za-z.]+)$")
 
 @dataclass
 class Chunk:
-    """A single speakable unit of a script."""
+    """A single speakable unit of a script.
+
+    `emphasis` marks a chunk that overlapped an inline emphasis span
+    (`*word*` / `[emph]...[/emph]`); the engine delivers it with raised
+    exaggeration. Plain chunking never sets it — see `chinai.prosody`.
+    """
 
     text: str
     pause_after: float
+    emphasis: bool = False
 
 
 def _normalize_whitespace(text: str) -> str:

@@ -23,7 +23,10 @@ from chinai import __version__
 from chinai.engine import (
     DEFAULT_CFG_WEIGHT,
     DEFAULT_EXAGGERATION,
+    DEFAULT_RATE,
     DEFAULT_TEMPERATURE,
+    MAX_RATE,
+    MIN_RATE,
 )
 from chinai.studio import history
 from chinai.studio.jobs import JobBusyError, JobManager, JobNotFoundError
@@ -50,6 +53,7 @@ class JobRequest(BaseModel):
     exaggeration: float = Field(default=DEFAULT_EXAGGERATION, ge=0.0, le=1.0)
     cfg_weight: float = Field(default=DEFAULT_CFG_WEIGHT, ge=0.0, le=1.0)
     temperature: float = Field(default=DEFAULT_TEMPERATURE, gt=0.0, le=2.0)
+    rate: float = Field(default=DEFAULT_RATE, ge=MIN_RATE, le=MAX_RATE)
     seed: int | None = None
 
 
@@ -186,6 +190,7 @@ def create_app(
             "exaggeration": request.exaggeration,
             "cfg_weight": request.cfg_weight,
             "temperature": request.temperature,
+            "rate": request.rate,
             "seed": request.seed,
         }
         try:

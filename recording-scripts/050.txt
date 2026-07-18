@@ -1,0 +1,4 @@
+I've made my decision, and it stands.
+We are not shipping until the tests are green and the review is done.
+This matters too much to rush.
+Hold the line, and trust the process we agreed on.

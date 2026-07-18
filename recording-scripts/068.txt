@@ -1,0 +1,5 @@
+The idea behind the project is pretty simple once you see it.
+You record yourself reading a set of short scripts, one file at a time, and the software studies the pattern of your voice.
+It learns not just the sound, but the rhythm and the little pauses that make you sound like you.
+The more careful and consistent the recordings are, the closer the result gets.
+After that, it can read almost any sentence back in a voice that feels familiar.

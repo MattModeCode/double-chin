@@ -1,45 +1,81 @@
 # ChinAI rendering levers (ground truth)
 
-ChinAI's engine is Chatterbox TTS, and it reads text **verbatim** — there is
-no SSML, no `<break>` tag, no `[pause]` token, no markup of any kind. Every
-lever below is either punctuation the model itself voices, or structural
-whitespace the chunker turns into stitched silence. Do not invent syntax
-outside this list; the engine will simply speak it aloud as literal
-characters.
+ChinAI's engine is Chatterbox TTS. Chatterbox itself has **no SSML** — it
+reads whatever text it is handed verbatim. But ChinAI now runs a thin,
+**honest prosody layer** (`src/chinai/prosody.py`) that parses a tiny inline
+markup *before* the text reaches the model and compiles it into the real
+levers the engine already has: variable stitched silence and per-chunk
+emotional intensity. Plus a genuine speaking-rate control applied as a
+pitch-preserving time-stretch on the finished audio.
 
-## What actually reaches the audio
+So there are two kinds of lever: the **inline markup** ChinAI parses (below),
+and the punctuation/whitespace Chatterbox voices on its own. Anything outside
+the supported markup is passed through verbatim — unrecognized brackets are
+stripped so they are never spoken, but invented SSML-style tags are not
+understood. Stick to the markup documented here.
+
+## Inline markup ChinAI parses (compiled before the model sees the text)
+
+Parsed in `src/chinai/prosody.py::compile_script`, which the engine calls in
+place of the raw chunker.
+
+| Markup | Mechanism | Effect |
+|---|---|---|
+| `[pause:N]` | splits the script at that point; `N` seconds (clamped to ≤10) becomes the `pause_after` of the preceding chunk, overriding the default | **exactly N s** of stitched silence — any duration you want, not just the two defaults |
+| `[break]` | same, with the default duration | **+0.5s** stitched silence (`DEFAULT_BREAK_SECONDS`) |
+| `*word*` | marks any chunk overlapping the span as `emphasis=True`; the engine raises that chunk's generation exaggeration by `+0.3` and lowers `cfg_weight` by `0.1` (both clamped) | that span is delivered **hotter / more intense** than the rest |
+| `[emph]…[/emph]` | same as `*word*`, bracketed form for multi-word or asterisk-containing spans | same |
+
+Notes on the markup:
+- **Granularity is the chunk, not the exact word.** Chatterbox's exaggeration
+  is a per-`generate()` (per-chunk) control — there is no sub-chunk knob — so
+  emphasizing a word raises intensity for the whole chunk that contains it.
+  Put a `[pause:…]` or sentence break around a phrase to isolate it if you
+  need tighter targeting.
+- **Markup never leaks into audio.** Unbalanced `*`, stray `[/emph]`, or a
+  malformed `[pause:abc]` are stripped/dropped, never spoken. A lone `*` that
+  isn't part of a pair is left as literal text.
+- A `[pause:…]` with no speech before it (leading, or two in a row) folds into
+  the nearest prior chunk, or is dropped if there is nothing before it.
+
+## Global delivery params
 
 | Lever | Mechanism | Effect | Citation |
 |---|---|---|---|
-| `,` mid-clause | passed to the model as part of the chunk text | brief voiced pause / breath | text flows verbatim into `model.generate(chunk.text, ...)` — `src/chinai/engine.py:120-125` |
-| `—` / `…` | same — voiced hold, longer than a comma | longer voiced pause, no *added* silence | same |
-| Sentence end (`. ? !` or `…`) | ends a `Chunk`; chunker attaches `pause_after` | **+0.35s** stitched silence between the audio of this chunk and the next | `INTRA_PARAGRAPH_PAUSE_SECONDS = 0.35` — `src/chinai/chunk.py:15`; realized as `torch.zeros` padding — `src/chinai/engine.py:128-131` |
-| Blank line (paragraph break) | ends a paragraph; last chunk of the paragraph gets the larger pause | **+0.7s** stitched silence | `INTER_PARAGRAPH_PAUSE_SECONDS = 0.7` — `src/chinai/chunk.py:16` |
-| `--exaggeration` | Chatterbox emotional-intensity control, used both when conditioning on the reference and at generation | whole-utterance delivery energy | default `0.5` — `src/chinai/engine.py:15`; `cli.py:55` |
-| `--cfg` (reference adherence) | classifier-free-guidance weight | higher = sticks closer to the reference recording's delivery | default `0.5` — `src/chinai/engine.py:16`; `cli.py:56` |
-| `--temperature` | sampling temperature | lower = more consistent between takes, higher = more variation | default `0.8` — `src/chinai/engine.py:17`; `cli.py:57` |
+| `--rate` / `rate` (0.5–2.0) | **pitch-preserving time-stretch** of the finished audio via `librosa.effects.time_stretch` | genuine speaking-rate / cadence control — `1.0` unchanged, `>1` faster, `<1` slower. Chatterbox has no native rate knob; this is layered on after generation, so pitch is preserved. | default `1.0` — `src/chinai/engine.py` (`DEFAULT_RATE`); `cli.py --rate`; Studio "Speaking rate" slider |
+| `--exaggeration` | Chatterbox emotional-intensity control, used both when conditioning on the reference and at generation | whole-utterance delivery energy (the **style/intensity** knob) | default `0.5` — `src/chinai/engine.py`; `cli.py` |
+| `--cfg` (reference adherence) | classifier-free-guidance weight | higher = sticks closer to the reference recording's delivery | default `0.5` — `src/chinai/engine.py`; `cli.py` |
+| `--temperature` | sampling temperature | lower = more consistent between takes, higher = more variation | default `0.8` — `src/chinai/engine.py`; `cli.py` |
 
-There is no speaking-rate/speed knob, no per-word emphasis, no top_k/top_p.
+## Punctuation/whitespace Chatterbox voices on its own
 
-## What does NOT work (do not emit these)
+| Lever | Mechanism | Effect |
+|---|---|---|
+| `,` mid-clause | passed to the model as part of the chunk text | brief voiced pause / breath |
+| `—` / `…` | same — voiced hold, longer than a comma | longer voiced pause, no *added* silence |
+| Sentence end (`. ? !` or `…`) | ends a `Chunk`; chunker attaches `pause_after` | **+0.35s** stitched silence (`INTRA_PARAGRAPH_PAUSE_SECONDS`), unless overridden by `[pause:N]` |
+| Blank line (paragraph break) | ends a paragraph; last chunk gets the larger pause | **+0.7s** stitched silence (`INTER_PARAGRAPH_PAUSE_SECONDS`) |
 
-- `<break time="0.4s"/>` or any SSML — Chatterbox has no SSML parser; it will
-  be read aloud as literal text.
-- `[pause]`, `(pause)`, `...pause...` style bracket tokens — same problem,
-  read aloud verbatim.
-- Markdown emphasis (`**bold**`, `*italic*`) — no effect on delivery; the
-  asterisks would be read as characters.
-- A "pause=0.8" style inline directive — the engine has no variable-pause
-  mechanism at all; only the two fixed durations above exist.
+## What still does NOT work (do not emit these)
 
-## The only two silence durations that exist
+- `<break time="0.4s"/>` or any real SSML — Chatterbox has no SSML parser and
+  ChinAI's markup is not SSML. Use `[pause:0.4]` instead.
+- `[pause]`/`(pause)` with no number — only `[pause:N]` (numeric) and `[break]`
+  are recognized; a bare `[pause]` is treated as unknown and stripped.
+- Per-word emphasis at sub-chunk resolution — emphasis is per chunk (see above).
+- `top_k` / `top_p` — not exposed by Chatterbox's `generate()`.
+- Taking cadence from one clip and timbre from another (a separate "style
+  reference") — Chatterbox has a single conditioning path (`prepare_conditionals`
+  takes exactly one clip and it defines the *speaker*). Seeding it from a second
+  clip would swap the voice identity, so ChinAI does **not** offer a `style_ref`.
+  Use `--exaggeration`, `--rate`, and inline markup for delivery instead.
 
-0.35s (sentence-internal-to-chunk boundary) and 0.7s (paragraph boundary).
-There is no way to request, say, a 1.2s dramatic pause exactly — the closest
-approximation is a blank line (0.7s) plus a trailing `…` on the prior
-sentence to add a bit of voiced hold before the stitched silence starts.
-Always be upfront in the output that this is an approximation, not an exact
-reproduction, when a source pause is much longer than 0.7s.
+## Silence durations now available
+
+Any duration via `[pause:N]` (0–10s), plus `[break]` (0.5s) and the two
+structural defaults (0.35s sentence, 0.7s paragraph). A 1.2s dramatic pause is
+now exact: write `[pause:1.2]`. The old blank-line-plus-`…` approximation is no
+longer necessary.
 
 ## Letter elongation (explicitly requested)
 

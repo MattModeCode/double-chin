@@ -1,0 +1,4 @@
+Here's the plan, and we're going to stick to it.
+We start at eight, we finish the first phase by noon, and we do not skip the checks.
+If something breaks, we stop and fix it properly.
+No shortcuts, no exceptions.
