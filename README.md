@@ -51,12 +51,35 @@ First run loads ~6 GB of weights; after that the model loads in under 10 seconds
 
 ## Clone your own voice
 
-Follow the 15-minute [recording kit](docs/recording-scripts.md) — it contains the exact scripts to read and the mic/room rules that make or break a clone. Then:
+### Quick path (zero-shot, 60 seconds of audio)
+
+Follow the 15-minute [recording kit](docs/recording-scripts.md) — Rainbow Passage + Harvard sentences — then:
 
 ```bash
 chinai enroll me ~/Desktop/my-voice/
 chinai say --script your-script.txt --voice me -o out.wav --verify
 ```
+
+### Indistinguishable path (fine-tuned, ~48 minutes of audio)
+
+For a voice the owner cannot distinguish from real, record the [79-take corpus](recording-scripts/) (~50 minutes, diverse phonetics and prosody):
+
+```bash
+# Record: use the provided scripts in recording-scripts/NNN.txt
+# Save audio files as recording-scripts/NNN.m4a / .wav (one per script)
+
+chinai enroll me recording-scripts/  # enroll the quick reference first
+chinai train me recording-scripts/ --manifest recording-scripts/manifest.tsv
+chinai say "Hello, world." --voice me -o out.wav --verify
+```
+
+After `chinai train`, the adapter is cached; `--voice me` auto-loads it. Test the gate:
+
+```bash
+chinai gate me
+```
+
+The gate runs a four-signal suite (speaker discrimination, leave-one-out naturalness proxy, prosody similarity, and a synthesized-vs-real ABX component). It prints a verdict: pass ≥0.70 composite score.
 
 ## CLI
 
@@ -65,17 +88,25 @@ chinai say --script your-script.txt --voice me -o out.wav --verify
 | `chinai studio` | Launch the ChinAI application (`--port`, `--no-browser`) |
 | `chinai enroll NAME SRC...` | Build a voice from recordings (wav/m4a/mp3/flac; files or a folder) |
 | `chinai say TEXT \| --script FILE` | Synthesize speech; `--voice NAME` or `--ref WAV`; `-o OUT.wav` |
-| `chinai voices` | List enrolled voices |
+| `chinai train NAME RECORDINGS_DIR` | Fine-tune a LoRA adapter on a directory of recordings + manifest.tsv |
+| `chinai voices` | List enrolled voices (shows which have adapters) |
+| `chinai gate [VOICE]` | Run the indistinguishability suite (speaker, naturalness, prosody); emit a pass/fail verdict |
 | `chinai verify A.wav B.wav` | Speaker-similarity score + verdict between any two clips |
 | `chinai doctor` | Environment health check (offline) |
 
-Useful `say` flags: `--verify` (score the output against a held-out clip from enrolment, falling back to the reference), `--seed N` (reproducible takes), `--exaggeration 0..1` (emotion intensity), `--cfg 0..1` (reference adherence), `--temperature`, `--device mps|cuda|cpu`.
+Useful `say` flags: `--voice NAME` auto-uses any trained adapter; `--verify` (score against held-out or reference), `--seed N` (reproducible takes), `--rate 0.5..2.0` (pitch-preserving speaking-rate time-stretch), `--exaggeration 0..1` (emotion), `--cfg 0..1` (reference adherence), `--temperature`, `--device mps|cuda|cpu`.
 
 Know what `--verify` measures: it scores *who* the output sounds like, not *what* was said or whether it is intelligible. A wrong-words render in the right timbre would still score high; listen to your outputs.
 
 ## How it works
 
-Zero-shot conditioning, not training: [Chatterbox TTS](https://github.com/resemble-ai/chatterbox) (MIT, 0.5B params) conditions on the first ~10 s of your reference clip and generates speech in that voice. Enrolment just assembles your best reference audio — no GPU-hours, instantly reversible. Scripts are split into sentence-aware chunks, synthesized on Apple's GPU (MPS), stitched with natural pauses, and optionally verified with [resemblyzer](https://github.com/resemble-ai/Resemblyzer) speaker embeddings. Full architecture, tournament, and tradeoffs: [docs/design.md](docs/design.md).
+ChinAI runs [Chatterbox TTS](https://github.com/resemble-ai/chatterbox) (MIT, 0.5B params, native to Apple Silicon) in two modes:
+
+**Zero-shot (fast, reference-based).** The engine conditions on your reference clip and generates speech in that voice — no training required. Enrolment just assembles your best reference audio. Instantly reversible, no GPU-hours.
+
+**Fine-tuned (accurate, locally trained).** For an indistinguishable clone, record ~48 minutes using the [recording-scripts/](recording-scripts/) kit and run `chinai train` to fine-tune a LoRA adapter on your voice's cadence and prosody. The adapter runs on Apple Silicon (MPS) and costs nothing; smoke-tested at ~20–40 minutes per training run. The zero-shot path remains the fallback.
+
+Both paths synthesize scripts split into sentence-aware chunks on Apple's GPU (MPS), stitch with natural pauses and prosody markup, and optionally verify with [resemblyzer](https://github.com/resemble-ai/Resemblyzer) speaker embeddings. Full architecture, decision rationale, and tradeoffs: [docs/design.md](docs/design.md).
 
 ## Project layout
 
