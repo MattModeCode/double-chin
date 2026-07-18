@@ -27,7 +27,7 @@ just cosine); `pytest -m "not slow"` green + new `CHINAI_E2E=1` e2e passes; ship
 | G5 | Phase 2 — HUMAN HAND-OFF: scripts delivered to owner | LEAD | DELIVERED | 1 | recording-scripts/README.md; awaiting owner audio (non-blocking) |
 | G6 | Phase 3 — finetune pipeline + LoRA-aware engine integration | team | DONE | 1 | src/chinai/finetune/; `chinai train`; engine lora_path kwarg; 63 tests green |
 | G7 | Phase 3 — prosody controls (pause/emphasis markup + rate) | team | DONE | 1 | src/chinai/prosody.py; --rate; UI slider; 89 tests green |
-| G8 | Phase 4 — indistinguishability gate (EER/ABX+naturalness+prosody) | team | DONE | 1 | src/chinai/verification/; `chinai gate`; 107 tests; demo/quiz 0.886 PASS |
+| G8 | Phase 4 — indistinguishability gate + real-voice run | team | DONE | 2 | gate PASS 0.822 on owner's fine-tuned voice (near-indistinguishable) |
 | G9 | Phase 5 — docs + ship PR | LEAD | DONE | 1 | PR #2 open: github.com/MattModeCode/ChinAI/pull/2 |
 
 ## Decisions (append-only)
@@ -51,7 +51,7 @@ just cosine); `pytest -m "not slow"` green + new `CHINAI_E2E=1` e2e passes; ship
 - G2 attempt 1: decision synthesized by lead from recovered cache → .goal/decision.md.
 - G3 attempt 1: NEXT — set up Chatterbox fine-tune env + MPS device patch + short smoke-train.
 
-HEARTBEAT: 2026-07-18T00:30:00Z SHIPPED PR #2. Paused at the one human dependency: owner's audio -> chinai train -> chinai gate.
+HEARTBEAT: 2026-07-18T20:25:00Z MISSION COMPLETE — gate PASS 0.822 on owner's real voice. Voice live in app.
 
 
 ## RESUME NOTE (2026-07-17T22:50Z — session usage limit, resets 7pm America/Toronto)
@@ -90,3 +90,17 @@ recording-scripts/001..079 -> `chinai train me <dir> --manifest recording-script
 -> `chinai gate me` must clear 0.70. That real fine-tune + gate is G8-final, and it
 needs the owner's real audio which does not exist yet.
 Resume after audio: run `/goal` (or just the 3 commands above).
+
+
+## MISSION COMPLETE (2026-07-18) — real fine-tune on owner's voice PASSED
+Owner recorded 79 takes (~32 min) -> enrolled 'owner' -> `chinai train owner` (10 epochs,
+670 steps, MPS, ~loss 3.5->0.4) -> `chinai gate owner`:
+  **PASS score 0.822 (threshold 0.70) — near-indistinguishable.**
+  speaker_similarity 0.831 (cosine 0.849) | discrimination 0.667 (clf acc 0.67) |
+  naturalness 0.999 [proxy] | prosody 0.822.
+Voice is live: `chinai say "..." --voice owner` (adapter auto-applied) + Studio UI.
+Headroom to top band (>=0.85 "indistinguishable"): discrimination is the weak axis
+(clone still separable above chance) -> more/cleaner audio (32min vs 48 target) and/or
+the planned RVC re-timbre stage-2 pass. Owner's cloned audio kept LOCAL (not committed).
+DoD: backend replaced+integrated, usable end-to-end in owner's voice, prosody controls,
+numeric gate cleared on real voice, 107 offline tests green, shipped PR #2. DONE.
