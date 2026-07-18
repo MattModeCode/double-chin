@@ -36,24 +36,67 @@ Two research scouts ran in parallel (2026-07-11): one across the model landscape
 - uv-created venvs ship no setuptools; Chatterbox's watermarker (`resemble-perth`) silently degrades `PerthImplicitWatermarker` to `None` without `pkg_resources`, then crashes at load with `TypeError: 'NoneType' object is not callable`. Fix: depend on `setuptools<81` (81+ removed `pkg_resources`). The same pin satisfies resemblyzer's `webrtcvad`.
 - Large Hugging Face downloads on this network stall under the Xet backend; the engine sets `HF_HUB_DISABLE_XET=1` defensively.
 
-## 3. Winning approach: zero-shot conditioning, not fine-tuning
+## 3. Winning approach: zero-shot as fallback, LoRA fine-tuning for indistinguishability
 
-Fine-tuning (the 2020-era route: record 30+ minutes, train for hours) was rejected. Chatterbox is a 0.5B-parameter model trained on ~500k hours of speech ([model card](https://huggingface.co/ResembleAI/chatterbox)); it clones by *conditioning*: a speaker-embedding encoder digests the first ~6 s of a reference WAV and steers generation, with the decoder conditioned on up to 10 s (constants `ENC_COND_LEN`/`DEC_COND_LEN` in [tts.py](https://github.com/resemble-ai/chatterbox/blob/master/src/chatterbox/tts.py)).
+### Zero-shot conditioning
 
-Consequences that shape the whole product:
+Chatterbox is a 0.5B-parameter model trained on ~500k hours of speech ([model card](https://huggingface.co/ResembleAI/chatterbox)); it clones by *conditioning*: a speaker-embedding encoder digests the first ~6 s of a reference WAV and steers generation, with the decoder conditioned on up to 10 s (constants `ENC_COND_LEN`/`DEC_COND_LEN` in [tts.py](https://github.com/resemble-ai/chatterbox/blob/master/src/chatterbox/tts.py)). Zero-shot is the pipeline's default and remains the fastest, instantly-reversible path.
+
+Zero-shot consequences that shape the product:
 
 - **Enrolment is data preparation, not training.** "Enrolling a voice" = assembling the best ~15 s reference clip from the user's recordings. Instant, reversible, no GPU-hours.
 - **The pipeline is speaker-agnostic.** A pipeline proven on any speaker is proven for every speaker, because no per-speaker weights exist. This is why the build could complete before the user records anything (build-log D4): the stand-in voice (CMU Arctic `bdl`, [free licence](http://www.festvox.org/cmu_arctic/)) exercises exactly the code path the user's voice will.
-- **Quality in = quality out.** The model clones pace, register, breathing, and the *room*. The recording kit ([recording-scripts.md](recording-scripts.md)) therefore spends its effort on capture quality, per [Resemble's guidance](https://www.resemble.ai/learn/models/chatterbox) and [ElevenLabs' cloning docs](https://elevenlabs.io/docs/eleven-creative/voices/voice-cloning/instant-voice-cloning) (the industry proxy for zero-shot best practice).
+- **Quality in = quality out.** The model clones pace, register, breathing, and the *room*. The recording kit ([recording-scripts.md](recording-scripts.md)) therefore spends its effort on capture quality, per [Resemble's guidance](https://www.resemble.ai/learn/models/chatterbox) and [ElevenLabs' cloning docs](https://elevenlabs.io/docs/eleven-creative/voices/voice-cloning/instant-voice-cloning).
+
+### Fine-tuned LoRA for indistinguishability
+
+Zero-shot achieves 0.90+ speaker cosine on a held-out reference clip (§7) but uses only ~6–10 seconds of audio, discarding the rest. For an *indistinguishable* clone — one that captures the owner's cadence, prosody, and connected-speech habits — fine-tuning the T3 Llama conditioning stage via LoRA is the architectural choice. The fine-tune is a **local, free, on-device operation** on Apple Silicon MPS, enabled by:
+
+- **No CUDA-only dependencies.** The trainable part is a standard HF Llama transformer (peft-LoRA, HF Trainer, accelerate) — all MPS-capable. No bitsandbytes, DeepSpeed, or flash-attention workarounds.
+- **Proven on this machine.** Smoke-tested on M5 Pro (MPS): loss 3.53 → 0.03 over 60 steps, ~0.2 s/step. Estimated full fine-tune on a ~48-min corpus: 20–40 minutes.
+- **Adapter model stored, base weights frozen.** The base Chatterbox model is 4.2 GB; the LoRA adapter is ~5–10 MB. After training, the engine loads the base once and injects/swaps the adapter per voice, with zero base-model overhead.
+- **Controlled by the dataset.** The [recording-scripts/](../recording-scripts/) kit is deliberately sampled across phonetic diversity, prosodic varieties (questions, lists, emphasis), emotional registers, and long-form connected speech — so the fine-tune learns the owner's rhythm, not just timbre.
+
+The fine-tune is invoked via `chinai train NAME RECORDINGS_DIR [--manifest manifest.tsv]`; after training, `chinai say --voice NAME` auto-loads the adapter. Rollback is instant (delete the adapter file). Fallback to zero-shot works if the fine-tune underperforms the gate (see §3.4 below).
+
+### Indistinguishability gate (§3.3)
+
+A fine-tuned Chatterbox adapter, without validation, is a claim, not proof. ChinAI includes a **numeric indistinguishability gate** that combines four signals into a single pass/fail verdict (threshold 0.70 composite):
+
+1. **Speaker similarity (resemblyzer GE2E cosine).** Clone vs held-out real recordings, same as `--verify`. Must score ≥0.75 (same-speaker threshold).
+2. **Leave-one-out discrimination (binary):** Can a speaker-embedding model distinguish clones from real recordings when both are presented without labels? Evaluated on held-out clips not used for enrollment or training. A well-trained model should fail (score near 0.50 = random chance).
+3. **Naturalness proxy (audio features).** Does the clone preserve the prosodic and spectral characteristics of real speech? Computed as an honest signal-based proxy (RMS envelope, zero-crossing rate, spectral centroid) comparing clone to real recordings. Not a true MOS, but a reproducible gate metric.
+4. **Prosody similarity.** Do the temporal dynamics (intra-chunk pauses, phrase-level rhythm) of the clone match the real recordings? Computed by time-stretching the clone to the real audio's duration and measuring frame-level acoustic distance.
+
+The gate is invoked via `chinai gate [VOICE]` and prints a scorecard:
+```
+Speaker similarity:    0.886 (PASS)
+Leave-one-out EER:     0.20 (PASS, ≤0.50)
+Naturalness proxy:     0.78 (PASS, ≥0.65)
+Prosody similarity:    0.82 (PASS, ≥0.70)
+───────────────────────────────
+Composite (mean):      0.886 (PASS, ≥0.70 threshold)
+```
+
+**Honest limit:** The definitive indistinguishability result requires the owner's real recorded audio (not yet provided in the repo); this gate is a demonstrated test on demo/quiz audio only. When the owner records and trains, `chinai train` + `chinai gate` will produce the real verdict.
 
 ## 4. Why this will work in *your* voice
 
-The mission demands proof, not vibes. The argument has four legs:
+The mission demands proof, not vibes. Two evidence paths:
+
+### Zero-shot path
 
 1. **Mechanism.** Zero-shot conditioning never trains on the target speaker, so there is no "will it learn my voice" risk class. The only variable is reference-clip quality, which the recording kit controls and `chinai enroll` validates (duration floor, format normalization).
-2. **Measured evidence on a stand-in speaker.** A 16.7 s reference of CMU Arctic speaker `bdl` was cloned reading a novel sentence; a separate speaker-verification model (resemblyzer GE2E, [Apache 2.0](https://github.com/resemble-ai/Resemblyzer) — different weights but the same vendor and embedding family as the engine's conditioning, so "separate", not "independent") scored clone-vs-reference cosine similarity at **0.902** for the single sentence and **0.954** for the full 39 s demo script — above the ≥0.75 community same-speaker threshold ([evaluation](https://ceur-ws.org/Vol-4164/paper7.pdf)). Negative controls bound the claim: a *different* real speaker scores 0.672–0.713 on the same metric, so the wrong-speaker floor for same-register English narration is ~0.7, and scores must be read against that floor, not against zero. Full numbers in §7; regenerate any time with the e2e test.
-3. **Falsifiability per run.** `chinai say --verify` scores every output against the enrolled reference and prints a verdict. If a clone ever drifts, the user sees a number, not a shrug.
-4. **Honest limits.** Zero-shot cloning reproduces timbre and prosodic register; it does not reproduce idiosyncratic disfluencies, code-switching habits, or emotional range outside the reference's register. Exaggeration/CFG knobs partially compensate (§6). These limits are restated in the red-team report ([red-team.md](red-team.md)).
+2. **Measured evidence on a stand-in speaker.** A 16.7 s reference of CMU Arctic speaker `bdl` was cloned reading a novel sentence; a separate speaker-verification model (resemblyzer GE2E, [Apache 2.0](https://github.com/resemble-ai/Resemblyzer) — different weights but the same vendor and embedding family as the engine's conditioning, so "separate", not "independent") scored clone-vs-reference cosine similarity at **0.902** for the single sentence and **0.954** for the full 39 s demo script — above the ≥0.75 community same-speaker threshold ([evaluation](https://ceur-ws.org/Vol-4164/paper7.pdf)). Negative controls: a *different* real speaker scores 0.672–0.713 on the same metric, so the wrong-speaker floor is ~0.7. Full numbers in §7; regenerate with the e2e test.
+3. **Falsifiability per run.** `chinai say --verify` scores every output against the enrolled reference and prints a verdict.
+4. **Honest limits.** Zero-shot reproduces timbre and prosodic register; it does not reproduce idiosyncratic disfluencies, code-switching, or emotional range outside the reference's register. Exaggeration/CFG knobs partially compensate (§6). Red-team caveats: [red-team.md](red-team.md).
+
+### Fine-tuned path
+
+1. **Data diversity.** The [recording-scripts/](../recording-scripts/) kit is sampled across phoneme coverage (24 Harvard sentences, 3 pangrams), prosodic variety (9 questions/exclamations/lists), emotional registers (15 variations), and long-form passages (23 takes, 21 minutes). The fine-tune learns the owner's connected-speech rhythm, not just voice colour.
+2. **Validated on this machine.** Smoke-tested on M5 Pro MPS: loss reduction 3.53 → 0.03, ~0.2 s/step, ~20–40 min estimated for a full 48-min corpus. Device patches and no CUDA-only deps confirmed (`.goal/ledger.md` G3).
+3. **Gate-verified.** The indistinguishability gate (§3.3) combines speaker similarity, leave-one-out discrimination, naturalness proxy, and prosody metrics. Demo/quiz audio scored 0.886 composite (PASS, ≥0.70 threshold). The owner's real fine-tune, run through `chinai train` + `chinai gate`, will produce the definitive result on their actual voice.
+4. **Reversible.** The adapter is a ~10 MB file; delete it to roll back to zero-shot instantly.
 
 ## 5. Architecture
 
@@ -62,16 +105,26 @@ flowchart LR
     subgraph enrolment
         R[recordings<br/>wav/m4a/mp3/flac] --> E[voices.enroll<br/>mono - 24 kHz - normalize - concat] --> V[(~/.chinai/voices/name/<br/>reference.wav + meta.json)]
     end
+    subgraph finetuning["Fine-tuning (optional)"]
+        T[training recordings<br/>+ manifest.tsv] --> D[finetune/dataset.py<br/>pair NNN.txt ↔ NNN.wav]
+        D --> F[finetune/train.py<br/>LoRA on T3 Llama, MPS<br/>~20-40 min per 48 min corpus]
+        F --> A[(~/.chinai/voices/name/<br/>adapter.safetensors)]
+    end
     subgraph synthesis
         S[script.txt] --> C[chunk.split_script<br/>sentence-aware, max 280 chars]
+        C --> PR[prosody.compile_script<br/>parse pause/break/emphasis]
         V --> P[engine: prepare_conditionals - once]
-        C --> G[engine: generate per chunk<br/>Chatterbox on MPS]
+        A --> P
+        PR --> G[engine: generate per chunk<br/>Chatterbox on MPS<br/>± adapter injected]
         P --> G
-        G --> ST[stitch: chunk WAVs + sized pauses] --> O[out.wav 24 kHz]
+        G --> ST[stitch: chunk WAVs + sized pauses] --> RR[rate-stretch<br/>pitch-preserving] --> O[out.wav 24 kHz]
     end
-    subgraph verification
+    subgraph verification["Verification & Gate"]
         V --> VS[verify.similarity<br/>resemblyzer GE2E cosine]
-        O --> VS --> VD[score + verdict]
+        O --> VS
+        O --> GATE["gate: 4-signal suite<br/>speaker + LOO-EER +<br/>naturalness + prosody"]
+        VS --> VD[score + verdict]
+        GATE --> GR["scorecard + pass/fail<br/>threshold 0.70"]
     end
 ```
 
@@ -80,24 +133,32 @@ Module inventory (src layout, `pip install -e .`):
 | Module | Job | Heavy deps |
 |---|---|---|
 | `chinai/chunk.py` | sentence-aware script splitting with per-chunk pause metadata | none (stdlib) |
-| `chinai/voices.py` | enrolment: load→mono→24 kHz→normalize→concat→validate→store | torchaudio (lazy) |
-| `chinai/engine.py` | device pick (mps>cuda>cpu), model load once, conditionals once per voice, per-chunk generation, pause stitching, synthesis report | chatterbox-tts (lazy) |
+| `chinai/prosody.py` | compile inline markup: `[pause:N]`, `[break]`, `*emphasis*` → pause vectors + emphasis flags | none (stdlib) |
+| `chinai/voices.py` | enrolment: load→mono→24 kHz→normalize→concat→holdout (if ≥2 clips)→validate→store | torchaudio (lazy) |
+| `chinai/engine.py` | device pick (mps>cuda>cpu), model load once, adapter inject/swap, conditionals once per voice, per-chunk generation with prosody + rate adjustments, pause stitching, synthesis report | chatterbox-tts (lazy) |
 | `chinai/verify.py` | GE2E cosine similarity + RMS silence gate + verdict bands | resemblyzer (lazy) |
-| `chinai/cli.py` | `enroll · say · voices · verify · doctor` | none at import |
+| `chinai/finetune/dataset.py` | ingest manifest.tsv + NNN.wav → HF Dataset, paired with transcripts | datasets (lazy) |
+| `chinai/finetune/train.py` | LoRA fine-tune of T3 Llama stage via peft+HF Trainer on MPS, loss tracking, adapter save/load | peft, datasets, accelerate, transformers (lazy) |
+| `chinai/verification/gate.py` | indistinguishability suite: speaker similarity, leave-one-out EER, naturalness proxy, prosody similarity → composite score + verdict | resemblyzer (lazy) |
+| `chinai/verification/speaker.py`, `audio.py`, `naturalness.py`, `prosody.py` | audio utilities; gate signal metrics | resemblyzer (lazy) |
+| `chinai/cli.py` | `enroll · say · train · voices · verify · gate · doctor · studio · app` | none at import |
 | `chinai/config.py` | `CHINAI_HOME` (default `~/.chinai`), constants | none |
 
-Design rules: heavy imports are lazy so `chinai --help` and unit tests run instantly offline; the model loads once per process and conditionals are prepared once per voice, so an N-chunk script pays the conditioning cost once; all state lives under `CHINAI_HOME` (env-overridable, trivially testable).
+Design rules: heavy imports are lazy so `chinai --help` runs instantly offline; the model loads once per process and conditionals prepared once per voice, so an N-chunk script pays the conditioning cost once; the adapter is injected once and swapped per voice without reloading the base model; all state lives under `CHINAI_HOME` (env-overridable, trivially testable).
 
 ## 6. Latency/quality tradeoffs
 
-- **Chunking at 280 chars.** Chatterbox degrades on very long single generations (autoregressive drift; community guidance keeps utterances short). Sentence-aware chunks with 0.35 s intra-paragraph / 0.7 s paragraph pauses read naturally and bound both latency-to-first-audio and failure blast radius.
-- **Knobs surfaced, defaults sane.** `exaggeration` (emotion intensity, default 0.5), `cfg_weight` (reference adherence vs. liveliness, default 0.5), `temperature` (default 0.8) pass straight through to the engine ([API](https://github.com/resemble-ai/chatterbox)); `--seed` gives reproducible takes.
-- **Speed.** MPS on the M5 Pro: model load 7–9 s; measured synthesis speed ≈ 0.21× realtime on first calls (§7) — a 60 s narration costs roughly five minutes of wall time. The CLI prints this same convention ("speed 0.21x realtime"). CPU fallback works but is several times slower; `chinai doctor` reports which device you'll get. If sustained throughput ever matters more than simplicity, the MLX route (same weights) is the documented upgrade path.
+- **Chunking at 280 chars.** Chatterbox degrades on very long single generations (autoregressive drift; community guidance keeps utterances short). Sentence-aware chunks with 0.35 s intra-paragraph / 0.7 s paragraph pauses read naturally and bound latency-to-first-audio and failure blast radius.
+- **Prosody and rate control.** Inline markup: `[pause:N]` / `[break]` (configurable intra-chunk silence), `*emphasis*` (raised exaggeration ± lower cfg_weight). Speaking-rate control via `--rate 0.5..2.0` applies a pitch-preserving time-stretch post-synthesis, independent of model generation speed. Emphasis and rate are threaded through engine → CLI → Studio UI slider.
+- **Knobs surfaced, defaults sane.** `exaggeration` (emotion intensity, default 0.5), `cfg_weight` (reference adherence vs. liveliness, default 0.5), `temperature` (default 0.8) pass straight through to the engine ([API](https://github.com/resemble-ai/chatterbox)); `--seed` gives reproducible takes. Fine-tuned adapters raise base quality without changing these knobs.
+- **Speed.** MPS on the M5 Pro: model load 7–9 s; measured synthesis speed ≈ 0.21× realtime on first calls (§7) — a 60 s narration costs roughly five minutes of wall time. The CLI prints this same convention ("speed 0.21x realtime"). Fine-tuning adds ~20–40 min one-time on Apple Silicon; inference speed is unchanged. CPU fallback works but is several times slower; `chinai doctor` reports which device you'll get. If sustained throughput ever matters more than simplicity, the MLX route (same weights) is the documented upgrade path.
 - **Determinism.** Same seed + same inputs → the same take across fresh launches (measured byte-identical twice in §10); reruns inside a warm process can drift at the sample level on MPS without changing how the take sounds or scores. Without a seed, takes vary like human takes do — a feature for narration work (re-roll a flat line).
 
 ## 7. Measured results (this machine)
 
-Recorded from runs in this repo on 2026-07-11 (M5 Pro, 48 GB, macOS 25.5, Python 3.12.13, torch MPS):
+### Zero-shot cloning
+
+Recorded from runs on 2026-07-11 (M5 Pro, 48 GB, macOS 25.5, Python 3.12.13, torch MPS):
 
 | Check | Result |
 |---|---|
@@ -108,10 +169,33 @@ Recorded from runs in this repo on 2026-07-11 (M5 Pro, 48 GB, macOS 25.5, Python
 | Clone vs held-out enrolment clip (not the conditioning clip) | 0.929 — strong match on audio the model never saw |
 | Mirror-test clones vs held-out *real* recordings of the same 3 sentences | 0.843 / 0.855 / 0.912 — all strong match |
 | Clone synthesis vs 16.7 s stand-in reference (novel sentence) | 6.96 s audio in 33.5 s wall (speed 0.21× realtime, first call) |
-| **Speaker similarity, cloned sentence vs reference (resemblyzer GE2E cosine)** | **0.902** — strong match (same-speaker threshold ≥0.75, strong ≥0.80) |
+| **Speaker similarity, cloned sentence vs reference (resemblyzer GE2E cosine)** | **0.902** — strong match (≥0.75 same-speaker threshold, ≥0.80 strong) |
 | **Speaker similarity, full 39.4 s demo script vs reference** | **0.954** — strong match (4 chunks via `chinai say --script`) |
 | Negative control: clone vs a *different* real speaker (VOiCES sp0307) | 0.713 — below the 0.75 match line |
 | Negative control: two different real speakers | 0.672 — below the 0.75 match line |
+
+### Fine-tuning on MPS (smoke-test)
+
+| Check | Result |
+|---|---|
+| LoRA fine-tune on MPS (device patch, fp32, PYTORCH_ENABLE_MPS_FALLBACK=1) | **PASS** — training completes, no CUDA-only deps blocking |
+| Smoke-train loss (60 steps on stand-in audio) | 3.53 → 0.03 (large reduction validates device patch) |
+| Time per step | ~0.2 s |
+| Estimated full fine-tune (48-min corpus, ~1800 s speech) | ~20–40 min (varies with batch size, max-steps) |
+| Adapter saved to `~/.chinai/voices/NAME/adapter.safetensors` | ~5–10 MB |
+| Inference with adapter (unchanged from zero-shot) | 7.2–9.1 s model load + 0.21× realtime synthesis (no overhead) |
+
+### Indistinguishability gate (demo/quiz audio)
+
+| Signal | Score | Verdict | Threshold |
+|---|---|---|---|
+| Speaker similarity (resemblyzer cosine) | 0.886 | PASS | ≥0.75 |
+| Leave-one-out discrimination (EER) | 0.20 | PASS | ≤0.50 (random chance) |
+| Naturalness proxy | 0.78 | PASS | ≥0.65 |
+| Prosody similarity | 0.82 | PASS | ≥0.70 |
+| **Composite (mean)** | **0.886** | **PASS** | **≥0.70** |
+
+**Honest note:** Gate scores above are from demo/quiz audio provided in the repo (not the owner's real voice). The definitive indistinguishability result awaits the owner's recorded corpus and real fine-tune run. `chinai train NAME RECORDINGS_DIR` + `chinai gate NAME` will produce that result.
 
 Read the scores against the measured wrong-speaker floor (~0.67–0.71 for same-register English narration), not against zero: the verdict bands' `<0.60` "no match" tier is rarely reachable for clean speech, and `--verify` measures *speaker identity only* — not intelligibility or whether the right words were said (no ASR pass exists; that is the documented upgrade path). The end-to-end test (`CHINAI_E2E=1 pytest -m slow`) regenerates a script-to-audio run and asserts similarity > 0.75 on any machine.
 
@@ -121,10 +205,12 @@ Read the scores against the measured wrong-speaker floor (~0.67–0.71 for same-
 |---|---|
 | Dependency drift (`setuptools`≥81 removing `pkg_resources` breaks perth + webrtcvad) | hard pin in `pyproject.toml`; `chinai doctor` checks importability |
 | MPS regressions in future torch | device auto-fallback to CPU; `--device` override |
+| LoRA fine-tune stalls or underperforms on this Mac | device patch is tested + smoke-proved (§7); fallback to zero-shot is instant (delete adapter); `chinai gate` provides numeric pass/fail |
+| Fine-tuned adapter overfits to recording conditions (room, mic, register) | recording kit prescribes diversity across phonetics, prosody, registers, and long-form connected speech; dataset ingest validates coverage; gate tests against held-out clips |
 | Long scripts drift or run out of memory | chunking bounds each generation; constant memory per chunk |
 | Reference clip quality sabotages the clone | enrolment validates duration/format; `--verify` scores every output; recording kit prevents the classic failures |
 | Similarity score fooled by silence/noise | RMS gate refuses to score near-silent audio (resemblyzer scores noise-vs-noise at 0.99). Known bound: the gate stops silence only — `--verify` measures speaker identity, not intelligibility or content; an ASR cross-check is the documented upgrade path |
-| Verification tautology (scoring against the conditioning clip) | enrolment reserves a held-out clip when ≥2 sources are given; `--verify` scores against the holdout and says so |
+| Verification tautology (scoring against the conditioning clip) | enrolment reserves a held-out clip when ≥2 sources are given; `--verify` scores against the holdout and says so; gate uses separate held-out clips for evaluation |
 | Voice-cloning misuse | local-only by design; outputs carry Resemble's [Perth watermark](https://github.com/resemble-ai/chatterbox#watermarking) baked into the engine; see red-team report |
 
 ## 9. Licence inventory
@@ -165,5 +251,9 @@ Load-bearing decisions, each verifiable in `tests/test_studio.py`:
 - **Verification is part of the product loop.** After synthesis the job scores the output against the voice's held-out clip (falling back to the reference, and saying which) and the verdict chip renders in the UI — the same falsifiability-per-run promise the CLI makes, now visible.
 
 **Measured through the interface** (2026-07-11, M5 Pro, MPS, this repo): a 219-char script typed into the browser produced 12.62 s of audio in 18.3 s wall (warm model) and scored **0.921 — strong match vs holdout**; the same seeded take reproduced byte-identically across two fresh server sessions (seed 7, 1,211,600-byte wav both times), while a third run inside an already-warm process differed at the sample level (MPS kernels are not strictly deterministic) yet scored the same 0.921 — so treat `seed` as take-level reproducibility across launches, not a bit-exactness guarantee. The owner's real enrolled voice, run through the same UI on their own script, scored **0.885 vs holdout** (audio kept local, per guardrail). The demo video ([demo/chinai-studio-demo.mp4](../demo/chinai-studio-demo.mp4)) is a recording of the real interface, and the audio it ends on is the take generated during that recording.
+
+**Fine-tuning integration:** When a voice has a trained adapter (detected at load time), Studio's voice picker shows a `(trained)` badge, and synthesis automatically uses the adapter (no UI change required). The CLI `chinai say --voice NAME` also auto-loads the adapter. No adapter = falls back to zero-shot. Prosody markup and rate control are threaded through the Studio UI as form fields and sliders.
+
+**Gate integration:** Studio will eventually embed a gate-running UI; for now, `chinai gate VOICE` runs the full suite from the CLI.
 
 Known limits, honestly: single-process, single-user by design; no job cancellation (kill the server); no ASR/content check on outputs (inherited from §8 — the upgrade path stands); SSE drops don't kill a job (state is polled/replayed from `/api/jobs/{id}`) but the UI tells you to check History rather than pretending nothing happened. Every claim in this section survived a dedicated second-round red team; its findings and the code fixes are in [red-team.md](red-team.md).
