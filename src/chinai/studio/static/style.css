@@ -70,6 +70,11 @@ textarea{resize:vertical;line-height:1.55}
 .voice-row select{flex:1}
 .hint{color:var(--hint);font-size:11.5px;margin-top:5px;line-height:1.5}
 .meta-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.prosody-help{margin-top:8px}
+.prosody-help code{
+  color:var(--muted);background:var(--bg);border:1px solid var(--line-soft);
+  border-radius:3px;padding:0 4px;font-family:var(--mono);font-size:11px;
+}
 
 /* ---------- buttons ---------- */
 button{
