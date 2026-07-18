@@ -21,7 +21,17 @@ from chinai.engine import (
 # Commands that actually touch chinai_home(); migration only needs to run
 # ahead of these, so `chinai verify` (arbitrary wav files, no storage) and
 # argparse-level exits (--help, unknown/missing command) never trigger it.
-_STORAGE_COMMANDS = frozenset({"enroll", "say", "train", "voices", "doctor", "studio", "app"})
+_STORAGE_COMMANDS = frozenset(
+    {"enroll", "say", "train", "voices", "doctor", "studio", "app", "gate"}
+)
+
+# Default script synthesized for `chinai gate VOICE` when no clone clips are
+# supplied. Split per sentence to produce several distinct clone clips.
+_DEFAULT_GATE_SCRIPT = (
+    "The quick brown fox jumps over the lazy dog. "
+    "She sells sea shells by the shore on a bright summer morning. "
+    "How much wood would a woodchuck chuck if it could chuck wood?"
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -99,6 +109,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     verify_parser.add_argument("ref", type=Path)
     verify_parser.add_argument("other", type=Path)
+
+    gate_parser = subparsers.add_parser(
+        "gate",
+        help=(
+            "Run the indistinguishability suite (speaker discrimination, "
+            "naturalness proxy, prosody) and print a scorecard."
+        ),
+    )
+    gate_parser.add_argument(
+        "voice", nargs="?",
+        help=(
+            "Enrolled voice: uses its holdout + reference as the real clips, "
+            "and synthesizes clones when --clone is omitted. Optional if both "
+            "--real and --clone are given."
+        ),
+    )
+    gate_parser.add_argument(
+        "--real", type=Path, default=None,
+        help="Directory or wav of genuine clips (overrides the voice's clips).",
+    )
+    gate_parser.add_argument(
+        "--clone", type=Path, default=None,
+        help="Directory or wav of cloned/synthesized clips to score.",
+    )
+    gate_parser.add_argument(
+        "--text", default=_DEFAULT_GATE_SCRIPT,
+        help="Script to synthesize when generating clones from a voice.",
+    )
+    gate_parser.add_argument("--device", default=None, help="Force a device (mps/cuda/cpu).")
+    gate_parser.add_argument(
+        "--json", action="store_true", help="Emit the raw result dict as JSON."
+    )
 
     subparsers.add_parser("doctor", help="Report environment diagnostics.")
 
@@ -241,6 +283,78 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+def _synthesize_clone_clips(voice, text: str, out_dir: Path, device: str | None) -> list[Path]:
+    """Synthesize one clone clip per sentence of `text` for the given voice."""
+    from chinai.chunk import split_script
+    from chinai.engine import ChinaiEngine
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    engine = ChinaiEngine(device=device)
+    clips: list[Path] = []
+    for index, chunk in enumerate(split_script(text)):
+        clip_path = out_dir / f"clone_{index:03d}.wav"
+        engine.synthesize(
+            script=chunk.text,
+            reference_wav=voice.reference_wav,
+            out_path=clip_path,
+            lora_path=voice.lora_path,
+        )
+        clips.append(clip_path)
+    return clips
+
+
+def _resolve_gate_inputs(args: argparse.Namespace):
+    """Resolve the (real_clips, clone_clips) pair from CLI arguments.
+
+    Precedence: explicit --real/--clone win; otherwise a named voice supplies
+    its holdout + reference as real clips and (when --clone is absent)
+    freshly-synthesized clones.
+    """
+    import tempfile
+
+    from chinai.voices import get_voice
+
+    voice = get_voice(args.voice) if args.voice else None
+
+    if args.real is not None:
+        real_clips = args.real
+    elif voice is not None:
+        real = [voice.reference_wav]
+        if voice.holdout_wav is not None:
+            real.insert(0, voice.holdout_wav)
+        real_clips = real
+    else:
+        raise ValueError("provide --real, or a voice name whose clips to use.")
+
+    if args.clone is not None:
+        clone_clips = args.clone
+    elif voice is not None:
+        out_dir = Path(tempfile.mkdtemp(prefix="chinai-gate-"))
+        print(f"Synthesizing clone clips for '{voice.name}' ...", file=sys.stderr)
+        clone_clips = _synthesize_clone_clips(voice, args.text, out_dir, args.device)
+    else:
+        raise ValueError("provide --clone, or a voice name to synthesize clones from.")
+
+    return real_clips, clone_clips
+
+
+def _cmd_gate(args: argparse.Namespace) -> int:
+    import json
+
+    from chinai.verification import format_scorecard, indistinguishability_gate
+
+    real_clips, clone_clips = _resolve_gate_inputs(args)
+    result = indistinguishability_gate(real_clips, clone_clips)
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print(format_scorecard(result))
+
+    # Non-zero exit when the gate fails, so scripts can branch on it.
+    return 0 if result["passed"] else 1
+
+
 def _which_in(directories: list[str], name: str) -> str | None:
     for directory in directories:
         candidate = Path(directory) / name
@@ -338,6 +452,7 @@ _HANDLERS = {
     "train": _cmd_train,
     "voices": _cmd_voices,
     "verify": _cmd_verify,
+    "gate": _cmd_gate,
     "doctor": _cmd_doctor,
     "studio": _cmd_studio,
     "app": _cmd_app,
