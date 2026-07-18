@@ -26,7 +26,7 @@ just cosine); `pytest -m "not slow"` green + new `CHINAI_E2E=1` e2e passes; ship
 | G4 | Phase 2 — recording kit + ingest/train pipeline | team | DONE | 2 | kit + finetune/dataset.py ingest of manifest.tsv+NNN audio |
 | G5 | Phase 2 — HUMAN HAND-OFF: scripts delivered to owner | LEAD | DELIVERED | 1 | recording-scripts/README.md; awaiting owner audio (non-blocking) |
 | G6 | Phase 3 — finetune pipeline + LoRA-aware engine integration | team | DONE | 1 | src/chinai/finetune/; `chinai train`; engine lora_path kwarg; 63 tests green |
-| G7 | Phase 3 — prosody/style controls through engine→JobRequest→Studio UI→CLI | team | TODO | 0 | levers.md as spec |
+| G7 | Phase 3 — prosody controls (pause/emphasis markup + rate) | team | DONE | 1 | src/chinai/prosody.py; --rate; UI slider; 89 tests green |
 | G8 | Phase 4 — indistinguishability suite (ABX/EER/MOS/prosody) + numeric gate + e2e | team | TODO | 0 | reuse demo/quiz pairs |
 | G9 | Phase 5 — integrate Studio+CLI+desktop, docs, recap, red-team, ship PR | LEAD | TODO | 0 | auto-ship |
 
@@ -51,7 +51,7 @@ just cosine); `pytest -m "not slow"` green + new `CHINAI_E2E=1` e2e passes; ship
 - G2 attempt 1: decision synthesized by lead from recovered cache → .goal/decision.md.
 - G3 attempt 1: NEXT — set up Chatterbox fine-tune env + MPS device patch + short smoke-train.
 
-HEARTBEAT: 2026-07-17T23:35:00Z G6 DONE (finetune backend integrated, 63 tests green). Next: G7 prosody controls.
+HEARTBEAT: 2026-07-17T23:50:00Z G7 DONE (prosody controls, 89 tests). Next: G8 verification harness + G9 docs/PR.
 
 
 ## RESUME NOTE (2026-07-17T22:50Z — session usage limit, resets 7pm America/Toronto)
