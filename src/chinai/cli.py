@@ -9,7 +9,14 @@ from pathlib import Path
 
 from chinai import __version__
 from chinai.config import chinai_home, migrate_legacy_home
-from chinai.engine import DEFAULT_CFG_WEIGHT, DEFAULT_EXAGGERATION, DEFAULT_TEMPERATURE
+from chinai.engine import (
+    DEFAULT_CFG_WEIGHT,
+    DEFAULT_EXAGGERATION,
+    DEFAULT_RATE,
+    DEFAULT_TEMPERATURE,
+    MAX_RATE,
+    MIN_RATE,
+)
 
 # Commands that actually touch chinai_home(); migration only needs to run
 # ahead of these, so `chinai verify` (arbitrary wav files, no storage) and
@@ -55,6 +62,13 @@ def build_parser() -> argparse.ArgumentParser:
     say_parser.add_argument("--exaggeration", type=float, default=DEFAULT_EXAGGERATION)
     say_parser.add_argument("--cfg", type=float, default=DEFAULT_CFG_WEIGHT)
     say_parser.add_argument("--temperature", type=float, default=DEFAULT_TEMPERATURE)
+    say_parser.add_argument(
+        "--rate", type=float, default=DEFAULT_RATE,
+        help=(
+            f"Speaking rate ({MIN_RATE}-{MAX_RATE}); pitch-preserving "
+            "time-stretch of the final audio. 1.0 = unchanged, >1 faster."
+        ),
+    )
     say_parser.add_argument("--seed", type=int, default=None)
     say_parser.add_argument("--device", default=None, help="Force a device (mps/cuda/cpu).")
 
@@ -137,6 +151,9 @@ def _cmd_say(args: argparse.Namespace) -> int:
         if not reference_wav.is_file():
             raise ValueError(f"reference wav not found: {reference_wav}")
 
+    if not MIN_RATE <= args.rate <= MAX_RATE:
+        raise ValueError(f"--rate must be between {MIN_RATE} and {MAX_RATE}")
+
     engine = ChinaiEngine(device=args.device)
     report = engine.synthesize(
         script=script_text,
@@ -145,6 +162,7 @@ def _cmd_say(args: argparse.Namespace) -> int:
         exaggeration=args.exaggeration,
         cfg_weight=args.cfg,
         temperature=args.temperature,
+        rate=args.rate,
         seed=args.seed,
         lora_path=lora_path,
     )

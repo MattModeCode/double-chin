@@ -113,6 +113,7 @@ async function generate() {
     exaggeration: parseFloat($("exaggeration").value),
     cfg_weight: parseFloat($("cfg").value),
     temperature: parseFloat($("temperature").value),
+    rate: parseFloat($("rate").value),
     seed: seedRaw === "" ? null : parseInt(seedRaw, 10),
   };
 
@@ -357,7 +358,7 @@ function wireControls() {
     }
   });
 
-  for (const id of ["exaggeration", "cfg", "temperature"]) {
+  for (const id of ["exaggeration", "cfg", "temperature", "rate"]) {
     $(id).addEventListener("input", () => {
       $(`${id}-val`).textContent = parseFloat($(id).value).toFixed(2);
     });

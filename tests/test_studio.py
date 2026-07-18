@@ -284,6 +284,28 @@ def test_job_text_over_limit_422(studio):
     assert response.status_code == 422
 
 
+def test_job_rate_out_of_range_422(studio, tmp_path):
+    client, _engine, _ = studio
+    _enroll_test_voice(tmp_path)
+    too_slow = client.post(
+        "/api/jobs", json={"voice": "testvoice", "text": "hi", "rate": 0.1}
+    )
+    too_fast = client.post(
+        "/api/jobs", json={"voice": "testvoice", "text": "hi", "rate": 5.0}
+    )
+    assert too_slow.status_code == 422
+    assert too_fast.status_code == 422
+
+
+def test_job_rate_passed_through_to_engine(studio, tmp_path):
+    client, engine, _ = studio
+    _enroll_test_voice(tmp_path)
+    job_id = _run_job(client)
+    _wait_done(client, job_id)
+    # Defaults still include rate; an explicit value threads through params.
+    assert engine.calls[0]["params"]["rate"] == 1.0
+
+
 def test_enroll_collision_then_overwrite(studio, tmp_path):
     client, _engine, _ = studio
     _enroll_test_voice(tmp_path, name="dupe")
