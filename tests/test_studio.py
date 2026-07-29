@@ -1,8 +1,8 @@
-"""Offline tests for the ChinAI application layer.
+"""Offline tests for the Double Chin application layer.
 
 A fake engine is injected through the app factory, so the whole HTTP
 surface — enrolment, jobs, SSE progress, history, audio serving — runs
-in-process with no model, no network, and CHINAI_HOME pointed at a tmp dir.
+in-process with no model, no network, and DOUBLECHIN_HOME pointed at a tmp dir.
 """
 
 from __future__ import annotations
@@ -15,12 +15,12 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from chinai.engine import SynthesisReport
-from chinai.studio.app import create_app
+from double_chin.engine import SynthesisReport
+from double_chin.studio.app import create_app
 
 # TestClient's default Host is "testserver"; the app's local-origin guard
 # only trusts loopback, so every client must present a 127.0.0.1 base URL —
-# exactly what a real browser hitting `chinai studio` sends.
+# exactly what a real browser hitting `double-chin studio` sends.
 _LOCAL_BASE = "http://127.0.0.1:8787"
 
 
@@ -29,7 +29,7 @@ def _client(app) -> TestClient:
 
 
 class FakeEngine:
-    """Mimics ChinaiEngine.synthesize: two chunks, writes a tiny wav."""
+    """Mimics DoubleChinEngine.synthesize: two chunks, writes a tiny wav."""
 
     def __init__(self, block_on: threading.Event | None = None) -> None:
         self.block_on = block_on
@@ -77,7 +77,7 @@ def _write_wav(path: Path, seconds: float) -> Path:
 
 @pytest.fixture
 def studio(tmp_path, monkeypatch):
-    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "home"))
     engine = FakeEngine()
     app = create_app(
         engine_factory=lambda: engine,
@@ -88,7 +88,7 @@ def studio(tmp_path, monkeypatch):
 
 
 def _enroll_test_voice(tmp_path, name="testvoice"):
-    from chinai.voices import enroll
+    from double_chin.voices import enroll
 
     src = tmp_path / "src"
     src.mkdir(exist_ok=True)
@@ -213,7 +213,7 @@ def test_job_happy_path_events_history_audio(studio, tmp_path):
 
 
 def test_second_job_while_running_409(tmp_path, monkeypatch):
-    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "home"))
     gate = threading.Event()
     app = create_app(
         engine_factory=lambda: FakeEngine(block_on=gate),
@@ -236,7 +236,7 @@ def test_second_job_while_running_409(tmp_path, monkeypatch):
 
 
 def test_engine_failure_surfaces_as_error_event(tmp_path, monkeypatch):
-    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "home"))
     app = create_app(engine_factory=ExplodingEngine, verify_fn=None)
     client = _client(app)
     _enroll_test_voice(tmp_path)
@@ -267,14 +267,14 @@ def test_doctor_reports_environment(studio):
     doctor = client.get("/api/doctor").json()
     assert doctor["voices"] == 0
     assert doctor["device"] in ("mps", "cuda", "cpu", None)
-    assert "chinai_home" in doctor
+    assert "double_chin_home" in doctor
 
 
 def test_index_served(studio):
     client, _engine, _ = studio
     response = client.get("/")
     assert response.status_code == 200
-    assert "ChinAI" in response.text
+    assert "Double Chin" in response.text
 
 
 def test_job_text_over_limit_422(studio):
@@ -386,8 +386,8 @@ def test_sse_replay_from_cursor(studio, tmp_path):
 
 
 def test_history_skips_corrupt_lines(tmp_path, monkeypatch):
-    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "home"))
-    from chinai.studio import history
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "home"))
+    from double_chin.studio import history
 
     history.append_record({"id": "good1", "voice": "v"})
     # Simulate a torn record (crash mid-append) that still ended in a
@@ -402,8 +402,8 @@ def test_history_skips_corrupt_lines(tmp_path, monkeypatch):
 
 
 def test_jobs_pruned_to_cap(tmp_path, monkeypatch):
-    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "home"))
-    from chinai.studio.jobs import _MAX_RETAINED_JOBS, JobManager
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "home"))
+    from double_chin.studio.jobs import _MAX_RETAINED_JOBS, JobManager
 
     app = create_app(
         engine_factory=lambda: FakeEngine(),

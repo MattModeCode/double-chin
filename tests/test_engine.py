@@ -1,10 +1,10 @@
-"""Offline tests for ChinaiEngine, using a fake Chatterbox model."""
+"""Offline tests for DoubleChinEngine, using a fake Chatterbox model."""
 
 from __future__ import annotations
 
 import pytest
 
-from chinai.engine import ChinaiEngine
+from double_chin.engine import DoubleChinEngine
 
 
 class FakeModel:
@@ -31,7 +31,7 @@ class FakeModel:
 @pytest.fixture
 def engine(monkeypatch, tmp_path):
     fake = FakeModel()
-    eng = ChinaiEngine(device="cpu")
+    eng = DoubleChinEngine(device="cpu")
     monkeypatch.setattr(eng, "_load_model", lambda: fake)
 
     reference = tmp_path / "ref.wav"

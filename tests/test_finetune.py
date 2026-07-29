@@ -2,7 +2,7 @@
 
 The unit tests exercise `dataset.build_examples` id-matching, skip, and split
 logic against a fake tokenizer/model, so they stay fast and need no weights. The
-slow test (CHINAI_E2E=1) runs a real ~20-step MPS LoRA fine-tune on the stand-in
+slow test (DOUBLECHIN_E2E=1) runs a real ~20-step MPS LoRA fine-tune on the stand-in
 voice and asserts the loss drops, mirroring tests/test_e2e.py.
 """
 
@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from chinai.finetune.dataset import build_examples, resolve_audio, split_examples
+from double_chin.finetune.dataset import build_examples, resolve_audio, split_examples
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -191,15 +191,15 @@ _STANDIN_TAKES = [
 
 @pytest.mark.slow
 @pytest.mark.skipif(
-    os.environ.get("CHINAI_E2E") != "1",
-    reason="set CHINAI_E2E=1 to run the real MPS fine-tune",
+    os.environ.get("DOUBLECHIN_E2E") != "1",
+    reason="set DOUBLECHIN_E2E=1 to run the real MPS fine-tune",
 )
 def test_finetune_standin_drops_loss(tmp_path, monkeypatch):
-    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
-    from chinai.finetune.train import finetune_voice
-    from chinai.voices import enroll, get_voice
+    from double_chin.finetune.train import finetune_voice
+    from double_chin.voices import enroll, get_voice
 
     enroll("standin", [REPO_ROOT / "demo" / "assets" / "standin_reference.wav"])
 

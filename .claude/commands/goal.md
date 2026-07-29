@@ -1,12 +1,12 @@
 ---
-description: Autonomous mission — rebuild ChinAI's voice backend so the clone is indistinguishable from the owner's real voice (local, free, Apple-Silicon), add prosody/cadence/style control, keep the whole app integrated and usable. Runs itself with heavy multi-agent orchestration and never stops until done; the only human input is recording audio.
+description: Autonomous mission — rebuild Double Chin's voice backend so the clone is indistinguishable from the owner's real voice (local, free, Apple-Silicon), add prosody/cadence/style control, keep the whole app integrated and usable. Runs itself with heavy multi-agent orchestration and never stops until done; the only human input is recording audio.
 argument-hint: "[optional steering note, or 'status' to print the ledger and stop]"
 ---
 
-# /goal — make ChinAI's cloned voice indistinguishable
+# /goal — make Double Chin's cloned voice indistinguishable
 
-You are the lead of an autonomous engineering run inside the **ChinAI** repo
-(`/Users/mc/chin/projects/chinai`). Your mission, from the owner:
+You are the lead of an autonomous engineering run inside the **Double Chin** repo
+(`/Users/mc/chin/projects/ChinAI`). Your mission, from the owner:
 
 > The current voice clone is *distinguishable* from my real voice. Replace the backend
 > so it is **completely indistinguishable**. I'll record audio manually from scripts you
@@ -17,7 +17,7 @@ You are the lead of an autonomous engineering run inside the **ChinAI** repo
 
 This command is your standing authorization to run **heavy multi-agent orchestration**
 (the `Workflow` tool, parallel `Agent` teams, judge tournaments, adversarial verifiers)
-and to **auto-ship** on a feature branch. Use it aggressively. `chinai` is a sovereign
+and to **auto-ship** on a feature branch. Use it aggressively. `double-chin` is a sovereign
 project repo — normal auto-ship applies here (this does **not** touch the chin OS repo's
 human-authored-commits rule).
 
@@ -29,7 +29,7 @@ Otherwise treat any `$ARGUMENTS` text as an operator steering note for this cycl
 
 ## 0. Prime directive
 
-Done = a stranger (or the owner) cannot reliably tell the ChinAI output from the owner's
+Done = a stranger (or the owner) cannot reliably tell the Double Chin output from the owner's
 real voice in a blind test, the whole app works end-to-end in that voice with working
 prosody/style controls, and the **only** thing that ever required the human was handing
 you their voice recordings. Do not return control to the human for any other reason.
@@ -56,7 +56,7 @@ you their voice recordings. Do not return control to the human for any other rea
 3. **Never ask** (see §1). Claude-only agent seats (the prior run excluded paid external
    models for exactly guardrails 1+3; keep it that way).
 4. **Preserve the app's existing invariants** while you rework it:
-   - Studio stays loopback-only with the same-origin guard (`src/chinai/studio/app.py:88`).
+   - Studio stays loopback-only with the same-origin guard (`src/double_chin/studio/app.py:88`).
    - Keep the Resemble **Perth watermark** in synthesized output.
    - Keep the offline unit suite green at **every** commit (`pytest -m "not slow" -q`).
 
@@ -162,7 +162,7 @@ When you reach the point where only the owner's real audio can advance the missi
 1. Make it **trivial** for them. Put in `.goal/handoff/` (and surface in the chat): the
    numbered scripts to read, a one-paragraph recording guide (quiet room, consistent mic
    ~20 cm, one take per file, natural delivery), and the **exact import command** to run
-   after recording (e.g. `chinai enroll <name> <files...>` or the new train entrypoint).
+   after recording (e.g. `double-chin enroll <name> <files...>` or the new train entrypoint).
 2. State precisely what you need and why (how much audio, what variety).
 3. **Then keep building.** Do every remaining task that does not strictly need the real
    audio, against a stand-in voice, so that when the audio lands the run finishes with one
@@ -173,27 +173,27 @@ When you reach the point where only the owner's real audio can advance the missi
 
 Swap the model **without breaking the interface** — the app is engine-agnostic by design:
 
-- Keep `ChinaiEngine.synthesize(script, reference_wav, out_path, exaggeration, cfg_weight,
+- Keep `DoubleChinEngine.synthesize(script, reference_wav, out_path, exaggeration, cfg_weight,
   temperature, max_chars, seed, progress) -> SynthesisReport` working
-  (`src/chinai/engine.py:76`). Preserve the per-chunk `progress(idx, total, text)` callback
-  so `src/chinai/studio/jobs.py` and the SSE stream are unaffected. If the new backend needs
+  (`src/double_chin/engine.py:76`). Preserve the per-chunk `progress(idx, total, text)` callback
+  so `src/double_chin/studio/jobs.py` and the SSE stream are unaffected. If the new backend needs
   a trained checkpoint instead of a raw reference wav, resolve it inside the engine/voice
   layer — do not change the callers' contract.
-- Extend enrollment `enroll()` in `src/chinai/voices.py:147` from the 20 s zero-shot clip to
+- Extend enrollment `enroll()` in `src/double_chin/voices.py:147` from the 20 s zero-shot clip to
   the fine-tune dataset path; **drop the `MAX_REFERENCE_SECONDS = 20.0` cap**
-  (`src/chinai/config.py:11`) and store the trained adapter/checkpoint alongside the voice.
+  (`src/double_chin/config.py:11`) and store the trained adapter/checkpoint alongside the voice.
 - **Prosody/cadence/style controls** (the "floor, not a ceiling" ask). Today the only lever
-  is two fixed silence lengths (`src/chinai/chunk.py:15`) and there is no SSML, pitch, rate,
-  or emphasis (documented in `.claude/skills/chinai-perform/references/levers.md` — use that
+  is two fixed silence lengths (`src/double_chin/chunk.py:15`) and there is no SSML, pitch, rate,
+  or emphasis (documented in `.claude/skills/double-chin-perform/references/levers.md` — use that
   file as the lever spec). Add real controls: inline pause/break markup, speaking-rate,
   emphasis, and a style/emotion reference, threaded through the engine → the `JobRequest`
-  model (`src/chinai/studio/app.py:47`) → Studio UI knobs (`src/chinai/studio/static/
-  index.html`, `app.js`) → CLI flags (`src/chinai/cli.py`). Keep the `chinai-perform` skill
+  model (`src/double_chin/studio/app.py:47`) → Studio UI knobs (`src/double_chin/studio/static/
+  index.html`, `app.js`) → CLI flags (`src/double_chin/cli.py`). Keep the `double-chin-perform` skill
   accurate to whatever you build.
-- **Verification suite (Phase 4):** extend `src/chinai/verify.py` beyond the single cosine
+- **Verification suite (Phase 4):** extend `src/double_chin/verify.py` beyond the single cosine
   (`verify.py:41`): a blind **ABX / mirror-test** (reuse the paired `demo/quiz/real_*.wav`
   vs `clone_*.wav` harness and the mirror-test quiz), speaker-verification EER, a naturalness
-  MOS proxy, and a prosody-similarity metric. Add a real-model e2e gated by `CHINAI_E2E=1`
+  MOS proxy, and a prosody-similarity metric. Add a real-model e2e gated by `DOUBLECHIN_E2E=1`
   (`pyproject.toml:26`) that asserts the new indistinguishability gate.
 
 ## 9. Definition of done (grade yourself; fix anything failing)
@@ -207,8 +207,8 @@ Swap the model **without breaking the interface** — the app is engine-agnostic
 - [ ] Recording scripts delivered + the ingest/fine-tune pipeline runs with one command;
       once the owner's audio is imported, the model **clears the numeric indistinguishability
       gate on their real voice**, with logged audio artifacts + scores (not just a cosine).
-- [ ] `pytest -m "not slow" -q` green; the new `CHINAI_E2E=1` slow e2e passes on real audio;
-      `chinai doctor` clean.
+- [ ] `pytest -m "not slow" -q` green; the new `DOUBLECHIN_E2E=1` slow e2e passes on real audio;
+      `double-chin doctor` clean.
 - [ ] Guardrails held (no spend, nothing left the machine, watermark + loopback intact);
       red-team objections addressed; `docs/` + `recap.html` updated; no placeholders.
 - [ ] Shipped on a feature branch with a PR. The **only** human input the whole run needed
@@ -219,8 +219,8 @@ Swap the model **without breaking the interface** — the app is engine-agnostic
 ```bash
 uv pip install --python .venv/bin/python -e ".[dev]"   # if deps changed
 pytest -m "not slow" -q                                 # primary gate — must stay green
-chinai doctor                                           # env/device/weights health
-CHINAI_E2E=1 pytest -m slow -q                           # real-model proof (after audio)
+double-chin doctor                                           # env/device/weights health
+DOUBLECHIN_E2E=1 pytest -m slow -q                           # real-model proof (after audio)
 ```
 
 ## 11. First-run bootstrap (do this now)

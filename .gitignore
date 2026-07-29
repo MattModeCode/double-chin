@@ -14,3 +14,8 @@ dist/
 
 # Personal scripts the owner feeds the app — private content, never commit
 voice clone scripts/
+
+# Runtime data dir, relocated here from ~/.chinai on 2026-07-28 to keep all AI
+# state under chin. Holds voice samples, a fine-tune checkpoint, and the style
+# profile — biometric data and multi-MB binaries. Same reason as *.m4a above.
+.chinai-data/

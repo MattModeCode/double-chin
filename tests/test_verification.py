@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from chinai.verification import (
+from double_chin.verification import (
     GATE_PASS_THRESHOLD,
     format_scorecard,
     gate_verdict,
@@ -24,8 +24,8 @@ from chinai.verification import (
     prosody_similarity,
     speaker_discrimination,
 )
-from chinai.verification.gate import _cosine_to_unit, _weighted_geometric_mean
-from chinai.verification.prosody import ProsodyFeatures, _relative_similarity
+from double_chin.verification.gate import _cosine_to_unit, _weighted_geometric_mean
+from double_chin.verification.prosody import ProsodyFeatures, _relative_similarity
 
 SR = 16000
 DEMO_IDS = ("a0010", "a0036", "a0060")

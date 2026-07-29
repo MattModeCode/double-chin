@@ -1,24 +1,24 @@
-"""Unit tests for chinai.config."""
+"""Unit tests for double_chin.config."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from chinai import config
+from double_chin import config
 
 
-def test_chinai_home_defaults_to_dot_chinai(monkeypatch):
-    monkeypatch.delenv("CHINAI_HOME", raising=False)
-    assert config.chinai_home() == Path.home() / ".chinai"
+def test_double_chin_home_defaults_to_dot_double_chin(monkeypatch):
+    monkeypatch.delenv("DOUBLECHIN_HOME", raising=False)
+    assert config.double_chin_home() == Path.home() / ".double-chin"
 
 
-def test_chinai_home_honours_env_override(tmp_path, monkeypatch):
-    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "custom"))
-    assert config.chinai_home() == tmp_path / "custom"
+def test_double_chin_home_honours_env_override(tmp_path, monkeypatch):
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "custom"))
+    assert config.double_chin_home() == tmp_path / "custom"
 
 
-def test_voices_dir_is_under_chinai_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "custom"))
+def test_voices_dir_is_under_double_chin_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "custom"))
     assert config.voices_dir() == tmp_path / "custom" / "voices"
 
 

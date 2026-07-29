@@ -1,6 +1,6 @@
 """End-to-end test exercising the real Chatterbox model.
 
-Skipped unless CHINAI_E2E=1, since it downloads/loads real model weights and
+Skipped unless DOUBLECHIN_E2E=1, since it downloads/loads real model weights and
 performs CPU/GPU inference against a real reference clip.
 """
 
@@ -21,18 +21,18 @@ _SIMILARITY_RE = re.compile(r"Speaker similarity vs [^:]+:\s*([0-9.]+)")
 
 
 @pytest.mark.skipif(
-    os.environ.get("CHINAI_E2E") != "1",
-    reason="set CHINAI_E2E=1 to run real-model end-to-end tests",
+    os.environ.get("DOUBLECHIN_E2E") != "1",
+    reason="set DOUBLECHIN_E2E=1 to run real-model end-to-end tests",
 )
 def test_say_produces_audio_with_real_model(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "home"))
-    from chinai.cli import main
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "home"))
+    from double_chin.cli import main
 
     out_path = tmp_path / "out.wav"
     exit_code = main(
         [
             "say",
-            "This is a short end to end test of ChinAI.",
+            "This is a short end to end test of Double Chin.",
             "--ref",
             str(REFERENCE_WAV),
             "-o",

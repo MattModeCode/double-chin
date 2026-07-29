@@ -1,10 +1,10 @@
-"""Unit tests for chinai.chunk."""
+"""Unit tests for double_chin.chunk."""
 
 from __future__ import annotations
 
 import pytest
 
-from chinai.chunk import (
+from double_chin.chunk import (
     INTER_PARAGRAPH_PAUSE_SECONDS,
     INTRA_PARAGRAPH_PAUSE_SECONDS,
     split_script,

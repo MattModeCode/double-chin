@@ -1,0 +1,484 @@
+"""Command-line interface for Double Chin."""
+
+from __future__ import annotations
+
+import argparse
+import shutil
+import sys
+from pathlib import Path
+
+from double_chin import __version__
+from double_chin.config import double_chin_home, migrate_legacy_home
+from double_chin.engine import (
+    DEFAULT_CFG_WEIGHT,
+    DEFAULT_EXAGGERATION,
+    DEFAULT_RATE,
+    DEFAULT_TEMPERATURE,
+    MAX_RATE,
+    MIN_RATE,
+)
+
+# Commands that actually touch double_chin_home(); migration only needs to run
+# ahead of these, so `double-chin verify` (arbitrary wav files, no storage) and
+# argparse-level exits (--help, unknown/missing command) never trigger it.
+_STORAGE_COMMANDS = frozenset(
+    {"enroll", "say", "train", "voices", "doctor", "studio", "app", "gate"}
+)
+
+# Default script synthesized for `double-chin gate VOICE` when no clone clips are
+# supplied. Split per sentence to produce several distinct clone clips.
+_DEFAULT_GATE_SCRIPT = (
+    "The quick brown fox jumps over the lazy dog. "
+    "She sells sea shells by the shore on a bright summer morning. "
+    "How much wood would a woodchuck chuck if it could chuck wood?"
+)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="double-chin",
+        description="Local voice-cloning CLI powered by Chatterbox TTS.",
+    )
+    parser.add_argument("--version", action="version", version=f"double-chin {__version__}")
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    enroll_parser = subparsers.add_parser(
+        "enroll", help="Enroll a voice from one or more reference recordings."
+    )
+    enroll_parser.add_argument("name", help="Voice name (lowercase letters, digits, '-', '_').")
+    enroll_parser.add_argument(
+        "sources", nargs="+", type=Path,
+        help="Audio files (.wav/.flac/.mp3/.m4a) or a directory containing them.",
+    )
+
+    say_parser = subparsers.add_parser(
+        "say", help="Synthesize a script in an enrolled or reference voice."
+    )
+    text_group = say_parser.add_mutually_exclusive_group(required=True)
+    text_group.add_argument("text", nargs="?", help="Text to speak.")
+    text_group.add_argument("--script", type=Path, help="Path to a text file containing the script.")
+    voice_group = say_parser.add_mutually_exclusive_group(required=True)
+    voice_group.add_argument("--voice", help="Name of an enrolled voice.")
+    voice_group.add_argument("--ref", type=Path, help="Path to a reference wav file.")
+    say_parser.add_argument(
+        "-o", "--out", type=Path, default=Path("double_chin_out.wav"),
+        help="Output wav path (default: ./double_chin_out.wav).",
+    )
+    say_parser.add_argument(
+        "--verify", action="store_true",
+        help="Verify speaker similarity against the reference after synthesis.",
+    )
+    say_parser.add_argument("--exaggeration", type=float, default=DEFAULT_EXAGGERATION)
+    say_parser.add_argument("--cfg", type=float, default=DEFAULT_CFG_WEIGHT)
+    say_parser.add_argument("--temperature", type=float, default=DEFAULT_TEMPERATURE)
+    say_parser.add_argument(
+        "--rate", type=float, default=DEFAULT_RATE,
+        help=(
+            f"Speaking rate ({MIN_RATE}-{MAX_RATE}); pitch-preserving "
+            "time-stretch of the final audio. 1.0 = unchanged, >1 faster."
+        ),
+    )
+    say_parser.add_argument("--seed", type=int, default=None)
+    say_parser.add_argument("--device", default=None, help="Force a device (mps/cuda/cpu).")
+
+    train_parser = subparsers.add_parser(
+        "train",
+        help="Fine-tune a LoRA voice adapter for an enrolled voice on your recordings.",
+    )
+    train_parser.add_argument("name", help="Name of an already-enrolled voice.")
+    train_parser.add_argument(
+        "recordings_dir", type=Path,
+        help="Directory of recordings named NNN.{wav,m4a,mp3,flac} matching the manifest.",
+    )
+    train_parser.add_argument(
+        "--manifest", type=Path, default=None,
+        help="Path to manifest.tsv (default: <recordings_dir>/manifest.tsv).",
+    )
+    train_parser.add_argument("--epochs", type=int, default=5, help="Passes over the training set.")
+    train_parser.add_argument(
+        "--max-steps", type=int, default=None,
+        help="Cap total optimizer steps (overrides --epochs when set).",
+    )
+    train_parser.add_argument("--device", default=None, help="Force a device (mps/cpu).")
+
+    subparsers.add_parser("voices", help="List enrolled voices.")
+
+    verify_parser = subparsers.add_parser(
+        "verify", help="Compare speaker similarity between two wav files."
+    )
+    verify_parser.add_argument("ref", type=Path)
+    verify_parser.add_argument("other", type=Path)
+
+    gate_parser = subparsers.add_parser(
+        "gate",
+        help=(
+            "Run the indistinguishability suite (speaker discrimination, "
+            "naturalness proxy, prosody) and print a scorecard."
+        ),
+    )
+    gate_parser.add_argument(
+        "voice", nargs="?",
+        help=(
+            "Enrolled voice: uses its holdout + reference as the real clips, "
+            "and synthesizes clones when --clone is omitted. Optional if both "
+            "--real and --clone are given."
+        ),
+    )
+    gate_parser.add_argument(
+        "--real", type=Path, default=None,
+        help="Directory or wav of genuine clips (overrides the voice's clips).",
+    )
+    gate_parser.add_argument(
+        "--clone", type=Path, default=None,
+        help="Directory or wav of cloned/synthesized clips to score.",
+    )
+    gate_parser.add_argument(
+        "--text", default=_DEFAULT_GATE_SCRIPT,
+        help="Script to synthesize when generating clones from a voice.",
+    )
+    gate_parser.add_argument("--device", default=None, help="Force a device (mps/cuda/cpu).")
+    gate_parser.add_argument(
+        "--json", action="store_true", help="Emit the raw result dict as JSON."
+    )
+
+    subparsers.add_parser("doctor", help="Report environment diagnostics.")
+
+    studio_parser = subparsers.add_parser(
+        "studio", help="Launch Double Chin, the local web application."
+    )
+    studio_parser.add_argument(
+        "--port", type=int, default=8787, help="Port to serve on (default: 8787)."
+    )
+    studio_parser.add_argument(
+        "--no-browser", action="store_true",
+        help="Don't open the browser automatically.",
+    )
+
+    subparsers.add_parser(
+        "app", help="Launch Double Chin as a native desktop window (no browser tab)."
+    )
+
+    return parser
+
+
+def _cmd_enroll(args: argparse.Namespace) -> int:
+    from double_chin.voices import enroll
+
+    info = enroll(args.name, args.sources)
+    print(f"Enrolled voice '{info.name}': {info.duration_seconds:.1f}s reference audio.")
+    print(f"Saved to {info.reference_wav}")
+    return 0
+
+
+def _cmd_say(args: argparse.Namespace) -> int:
+    from double_chin.engine import DoubleChinEngine
+    from double_chin.verify import similarity, verdict
+    from double_chin.voices import get_voice
+
+    if args.script:
+        if not args.script.is_file():
+            raise ValueError(f"script file not found: {args.script}")
+        script_text = args.script.read_text()
+    else:
+        script_text = args.text
+
+    if args.voice:
+        voice = get_voice(args.voice)
+        reference_wav = voice.reference_wav
+        lora_path = voice.lora_path
+    else:
+        reference_wav = args.ref
+        lora_path = None
+        if not reference_wav.is_file():
+            raise ValueError(f"reference wav not found: {reference_wav}")
+
+    if not MIN_RATE <= args.rate <= MAX_RATE:
+        raise ValueError(f"--rate must be between {MIN_RATE} and {MAX_RATE}")
+
+    engine = DoubleChinEngine(device=args.device)
+    report = engine.synthesize(
+        script=script_text,
+        reference_wav=reference_wav,
+        out_path=args.out,
+        exaggeration=args.exaggeration,
+        cfg_weight=args.cfg,
+        temperature=args.temperature,
+        rate=args.rate,
+        seed=args.seed,
+        lora_path=lora_path,
+    )
+    if lora_path is not None:
+        print(f"Using fine-tuned adapter: {lora_path}")
+
+    print(
+        f"Wrote {report.out_path} ({report.audio_seconds:.1f}s audio, "
+        f"{report.chunk_count} chunks)"
+    )
+    print(
+        f"Device: {report.device}; speed {report.speed_ratio:.2f}x realtime "
+        f"({report.wall_seconds:.1f} s wall for {report.audio_seconds:.1f} s audio)"
+    )
+
+    if args.verify:
+        if args.voice and voice.holdout_wav is not None:
+            compare_wav = voice.holdout_wav
+            label = "held-out clip"
+        else:
+            compare_wav = reference_wav
+            label = "reference (no holdout enrolled)"
+        score = similarity(compare_wav, report.out_path)
+        print(f"Speaker similarity vs {label}: {score:.3f} ({verdict(score)})")
+
+    return 0
+
+
+def _cmd_train(args: argparse.Namespace) -> int:
+    from double_chin.finetune.train import finetune_voice
+
+    def on_progress(step: int, total: int, loss: float) -> None:
+        if step == 1 or step == total or step % 5 == 0:
+            print(f"step {step}/{total}  loss={loss:.4f}", file=sys.stderr)
+
+    print(f"Fine-tuning voice '{args.name}' on {args.recordings_dir} ...", file=sys.stderr)
+    adapter_path = finetune_voice(
+        args.name,
+        args.recordings_dir,
+        manifest_path=args.manifest,
+        epochs=args.epochs,
+        max_steps=args.max_steps,
+        device=args.device,
+        progress=on_progress,
+    )
+    print(f"Fine-tuned voice '{args.name}'. Adapter saved to {adapter_path}")
+    print(f"Synthesize with it: double-chin say \"Hello.\" --voice {args.name}")
+    return 0
+
+
+def _cmd_voices(args: argparse.Namespace) -> int:
+    from double_chin.voices import list_voices
+
+    voices = list_voices()
+    if not voices:
+        print("No voices enrolled yet. Use 'chinai enroll NAME SOURCE...' to add one.")
+        return 0
+
+    name_width = max(len("name"), *(len(v.name) for v in voices))
+    print(f"{'name'.ljust(name_width)}  duration  created")
+    for voice in voices:
+        print(f"{voice.name.ljust(name_width)}  {voice.duration_seconds:6.1f}s  {voice.created}")
+    return 0
+
+
+def _cmd_verify(args: argparse.Namespace) -> int:
+    from double_chin.verify import similarity, verdict
+
+    if not args.ref.is_file():
+        raise ValueError(f"reference wav not found: {args.ref}")
+    if not args.other.is_file():
+        raise ValueError(f"comparison wav not found: {args.other}")
+
+    score = similarity(args.ref, args.other)
+    print(f"Similarity: {score:.3f} ({verdict(score)})")
+    return 0
+
+
+def _synthesize_clone_clips(voice, text: str, out_dir: Path, device: str | None) -> list[Path]:
+    """Synthesize one clone clip per sentence of `text` for the given voice."""
+    from double_chin.chunk import split_script
+    from double_chin.engine import DoubleChinEngine
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    engine = DoubleChinEngine(device=device)
+    clips: list[Path] = []
+    for index, chunk in enumerate(split_script(text)):
+        clip_path = out_dir / f"clone_{index:03d}.wav"
+        engine.synthesize(
+            script=chunk.text,
+            reference_wav=voice.reference_wav,
+            out_path=clip_path,
+            lora_path=voice.lora_path,
+        )
+        clips.append(clip_path)
+    return clips
+
+
+def _resolve_gate_inputs(args: argparse.Namespace):
+    """Resolve the (real_clips, clone_clips) pair from CLI arguments.
+
+    Precedence: explicit --real/--clone win; otherwise a named voice supplies
+    its holdout + reference as real clips and (when --clone is absent)
+    freshly-synthesized clones.
+    """
+    import tempfile
+
+    from double_chin.voices import get_voice
+
+    voice = get_voice(args.voice) if args.voice else None
+
+    if args.real is not None:
+        real_clips = args.real
+    elif voice is not None:
+        real = [voice.reference_wav]
+        if voice.holdout_wav is not None:
+            real.insert(0, voice.holdout_wav)
+        real_clips = real
+    else:
+        raise ValueError("provide --real, or a voice name whose clips to use.")
+
+    if args.clone is not None:
+        clone_clips = args.clone
+    elif voice is not None:
+        out_dir = Path(tempfile.mkdtemp(prefix="double-chin-gate-"))
+        print(f"Synthesizing clone clips for '{voice.name}' ...", file=sys.stderr)
+        clone_clips = _synthesize_clone_clips(voice, args.text, out_dir, args.device)
+    else:
+        raise ValueError("provide --clone, or a voice name to synthesize clones from.")
+
+    return real_clips, clone_clips
+
+
+def _cmd_gate(args: argparse.Namespace) -> int:
+    import json
+
+    from double_chin.verification import format_scorecard, indistinguishability_gate
+
+    real_clips, clone_clips = _resolve_gate_inputs(args)
+    result = indistinguishability_gate(real_clips, clone_clips)
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print(format_scorecard(result))
+
+    # Non-zero exit when the gate fails, so scripts can branch on it.
+    return 0 if result["passed"] else 1
+
+
+def _which_in(directories: list[str], name: str) -> str | None:
+    for directory in directories:
+        candidate = Path(directory) / name
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    import platform
+
+    print(f"PASS python: {platform.python_version()}")
+
+    try:
+        import torch
+
+        print(f"PASS torch: {torch.__version__}")
+        if torch.backends.mps.is_available():
+            device = "mps"
+        elif torch.cuda.is_available():
+            device = "cuda"
+        else:
+            device = "cpu"
+        print(f"PASS best device: {device}")
+    except ImportError:
+        print("WARN torch: not installed")
+
+    try:
+        import warnings
+
+        with warnings.catch_warnings():
+            # webrtcvad (a resemblyzer dep) imports the deprecated pkg_resources
+            # on import; that notice is harmless noise on a diagnostics command.
+            warnings.simplefilter("ignore")
+            import resemblyzer  # noqa: F401
+
+        print("PASS resemblyzer: importable")
+    except ImportError:
+        print("WARN resemblyzer: not installed; 'double-chin verify' will fail")
+
+    hf_cache = Path.home() / ".cache" / "huggingface"
+    chatterbox_dirs = [p for p in hf_cache.rglob("*chatterbox*") if p.is_dir()] if hf_cache.is_dir() else []
+    if chatterbox_dirs:
+        print(f"PASS model weights cached: {chatterbox_dirs[0]}")
+    else:
+        print("WARN model weights not found in the local Hugging Face cache; first synthesis will download them.")
+
+    ffmpeg_path = shutil.which("ffmpeg") or _which_in(["/opt/homebrew/bin"], "ffmpeg")
+    if ffmpeg_path:
+        print(f"PASS ffmpeg: {ffmpeg_path}")
+    else:
+        print("WARN ffmpeg not found on PATH.")
+
+    home = double_chin_home()
+    print(f"PASS double-chin home: {home}")
+
+    disk_check_path = home if home.exists() else Path.home()
+    usage = shutil.disk_usage(disk_check_path)
+    free_gb = usage.free / (1024 ** 3)
+    print(f"PASS free disk: {free_gb:.1f} GB")
+
+    return 0
+
+
+def _cmd_studio(args: argparse.Namespace) -> int:
+    import threading
+    import webbrowser
+
+    import uvicorn
+
+    from double_chin.studio.app import create_app
+
+    url = f"http://127.0.0.1:{args.port}"
+    print(f"Double Chin: {url}  (Ctrl-C to stop)")
+
+    if not args.no_browser:
+        # Give uvicorn a moment to bind before the browser asks for the page.
+        threading.Timer(1.0, webbrowser.open, args=(url,)).start()
+
+    # Loopback only, by design: Studio has no auth layer and must never
+    # listen on a routable interface.
+    uvicorn.run(create_app(), host="127.0.0.1", port=args.port, log_level="warning")
+    return 0
+
+
+def _cmd_app(args: argparse.Namespace) -> int:
+    from double_chin import desktop
+
+    return desktop.run()
+
+
+_HANDLERS = {
+    "enroll": _cmd_enroll,
+    "say": _cmd_say,
+    "train": _cmd_train,
+    "voices": _cmd_voices,
+    "verify": _cmd_verify,
+    "gate": _cmd_gate,
+    "doctor": _cmd_doctor,
+    "studio": _cmd_studio,
+    "app": _cmd_app,
+}
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.command in _STORAGE_COMMANDS:
+        migrated = migrate_legacy_home()
+        if migrated:
+            print(f"double-chin: migrated existing voice data to {migrated}", file=sys.stderr)
+
+    try:
+        return _HANDLERS[args.command](args)
+    except KeyboardInterrupt:
+        return 130
+    except ValueError as exc:
+        print(f"double-chin: error: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:  # torch/audio backends raise their own types
+        print(f"double-chin: error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

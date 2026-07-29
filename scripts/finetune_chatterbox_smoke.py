@@ -39,7 +39,7 @@ STEPS = 60
 LR = 1e-3
 LORA_R = 16
 LORA_ALPHA = 32
-ADAPTER_DIR = Path(os.path.expanduser("~/.chinai/finetune_smoke"))
+ADAPTER_DIR = Path(os.path.expanduser("~/.double-chin/finetune_smoke"))
 REPO = Path(__file__).resolve().parent.parent
 
 # (wav, transcript). Transcripts are the standard CMU-ARCTIC prompts for the

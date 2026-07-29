@@ -1,4 +1,4 @@
-"""Unit tests for chinai.prosody (inline markup compiler).
+"""Unit tests for double_chin.prosody (inline markup compiler).
 
 Pure parsing — no model, no audio, offline and fast.
 """
@@ -7,12 +7,12 @@ from __future__ import annotations
 
 import pytest
 
-from chinai.chunk import (
+from double_chin.chunk import (
     INTER_PARAGRAPH_PAUSE_SECONDS,
     INTRA_PARAGRAPH_PAUSE_SECONDS,
     split_script,
 )
-from chinai.prosody import (
+from double_chin.prosody import (
     DEFAULT_BREAK_SECONDS,
     MAX_PAUSE_SECONDS,
     compile_script,

@@ -1,4 +1,4 @@
-"""Unit tests for chinai.desktop.
+"""Unit tests for double_chin.desktop.
 
 Covers the two bugs fixed in the desktop shell:
 1. A PyInstaller-frozen build re-executes this entry point for every
@@ -13,21 +13,21 @@ Covers the two bugs fixed in the desktop shell:
 
 from __future__ import annotations
 
-from chinai.desktop import _acquire_single_instance_lock, _is_multiprocessing_child
+from double_chin.desktop import _acquire_single_instance_lock, _is_multiprocessing_child
 
 
 def test_genuine_launch_argv_is_not_a_multiprocessing_child():
-    assert _is_multiprocessing_child(["ChinAI"]) is False
+    assert _is_multiprocessing_child(["Double Chin"]) is False
 
 
 def test_spawned_worker_argv_is_a_multiprocessing_child():
-    argv = ["ChinAI", "--multiprocessing-fork", "tracker_fd=3", "pipe_handle=4"]
+    argv = ["Double Chin", "--multiprocessing-fork", "tracker_fd=3", "pipe_handle=4"]
     assert _is_multiprocessing_child(argv) is True
 
 
 def test_resource_tracker_bootstrap_argv_is_a_multiprocessing_child():
     argv = [
-        "ChinAI",
+        "Double Chin",
         "-c",
         "from multiprocessing.resource_tracker import main;main(3)",
     ]
@@ -36,12 +36,12 @@ def test_resource_tracker_bootstrap_argv_is_a_multiprocessing_child():
 
 def test_short_argv_is_not_a_multiprocessing_child():
     # Guards against an index error on argv shorter than the '-c' check expects.
-    assert _is_multiprocessing_child(["ChinAI"]) is False
+    assert _is_multiprocessing_child(["Double Chin"]) is False
     assert _is_multiprocessing_child([]) is False
 
 
 def test_single_instance_lock_blocks_second_acquire(tmp_path, monkeypatch):
-    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "home"))
 
     first = _acquire_single_instance_lock()
     try:
@@ -54,7 +54,7 @@ def test_single_instance_lock_blocks_second_acquire(tmp_path, monkeypatch):
 
 
 def test_single_instance_lock_releases_after_close(tmp_path, monkeypatch):
-    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "home"))
 
     first = _acquire_single_instance_lock()
     assert first is not None

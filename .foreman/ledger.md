@@ -1,4 +1,4 @@
-# Foreman ledger — ChinAI voice clone build
+# Foreman ledger — Double Chin voice clone build
 
 ## Baseline
 - Commit: d810d59 (Initial commit), branch main

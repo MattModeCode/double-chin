@@ -1,4 +1,4 @@
-"""Unit tests for chinai.voices."""
+"""Unit tests for double_chin.voices."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from chinai import config
-from chinai.voices import enroll, get_voice, list_voices
+from double_chin import config
+from double_chin.voices import enroll, get_voice, list_voices
 
 
 def _write_sine_wav(
@@ -33,8 +33,8 @@ def _write_sine_wav(
 
 
 @pytest.fixture(autouse=True)
-def _chinai_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("CHINAI_HOME", str(tmp_path / "chinai_home"))
+def _double_chin_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "double_chin_home"))
     yield
 
 

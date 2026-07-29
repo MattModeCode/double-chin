@@ -1,11 +1,11 @@
 # Fine-tuning recording kit
 
 This folder is the big recording kit — the one you read to build a **fine-tuning
-dataset** for ChinAI, not the quick 1–2 minute enrolment kit in
+dataset** for Double Chin, not the quick 1–2 minute enrolment kit in
 [`docs/recording-scripts.md`](../docs/recording-scripts.md).
 
 You read the numbered scripts (`001.txt` … `079.txt`) aloud, one file per
-recording, and save each recording under the **same number**. ChinAI pairs your
+recording, and save each recording under the **same number**. Double Chin pairs your
 audio `001.<ext>` with the transcript for take `001`, and so on down the list.
 That number-to-audio match is the whole contract — get the numbers right and the
 rest takes care of itself.
@@ -33,7 +33,7 @@ Same rules as the quick kit — consistency across every file is what matters mo
 1. **Sit ~20cm from the mic ("two fists" from your mouth to the device).**
    Consistent distance keeps loudness and tone even across every file.
 2. **Record in a quiet, soft-furnished room, or a closet full of clothes.** Hard,
-   empty rooms produce reverb, and ChinAI clones the room along with your voice.
+   empty rooms produce reverb, and Double Chin clones the room along with your voice.
 3. **No music, no other speakers, no background noise.** Anything audible in the
    recording becomes part of the clone.
 4. **Turn off noise gates, compressors, and noise-reduction / AI enhancement.**
@@ -44,7 +44,7 @@ Same rules as the quick kit — consistency across every file is what matters mo
    Bluetooth earbuds compress audio and apply noise suppression, which corrupts
    the recording.
 7. **Deliver every line at the pace and register you want the clone to use.**
-   ChinAI clones your pacing and inflection exactly as recorded.
+   Double Chin clones your pacing and inflection exactly as recorded.
 
 ## Recording settings
 
@@ -58,7 +58,7 @@ to the record button and set quality to **Maximum**. Record and save each take.
 16- or 24-bit, 44.1kHz or 48kHz sample rate, no compression / limiter /
 noise-reduction effects enabled.
 
-File format doesn't matter — `.m4a`, `.wav`, `.mp3`, and `.flac` all work. ChinAI
+File format doesn't matter — `.m4a`, `.wav`, `.mp3`, and `.flac` all work. Double Chin
 converts automatically. Sit down for each session in the same spot, at the same
 distance, with the same settings, so all your files match.
 
@@ -71,7 +71,7 @@ distance, with the same settings, so all your files match.
 4. Move to `002.txt`, and repeat down to `079.txt`.
 5. Put every recording in one folder (all named to match their take number).
 
-Read at conversational pace, in the voice register you want ChinAI to reproduce.
+Read at conversational pace, in the voice register you want Double Chin to reproduce.
 Re-record any take where you stumble, cough, or get interrupted — don't talk
 around a mistake, just do that one file again. A clean re-read always beats a
 patched one.

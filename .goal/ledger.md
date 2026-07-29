@@ -1,4 +1,4 @@
-# /goal ledger — ChinAI: make the cloned voice indistinguishable
+# /goal ledger — Double Chin: make the cloned voice indistinguishable
 
 **Mission:** Replace the zero-shot Chatterbox backend with a fine-tuned, local, free,
 Apple-Silicon voice model that is *indistinguishable* from the owner's real voice, add
@@ -14,7 +14,7 @@ See `.claude/commands/goal.md` §9. Summary: new backend integrated behind the e
 engine interface; app works end-to-end in owner's voice via Studio + CLI + desktop;
 prosody/style controls work; recording kit + one-command train delivered; model clears a
 numeric indistinguishability gate on the owner's real voice (blind ABX / EER / MOS, not
-just cosine); `pytest -m "not slow"` green + new `CHINAI_E2E=1` e2e passes; shipped as PR.
+just cosine); `pytest -m "not slow"` green + new `DOUBLECHIN_E2E=1` e2e passes; shipped as PR.
 
 ## Tasks
 | ID | Task | Owner | Status | Attempts | Notes |
@@ -25,10 +25,10 @@ just cosine); `pytest -m "not slow"` green + new `CHINAI_E2E=1` e2e passes; ship
 | G3 | Phase 1b — Chatterbox MPS fine-tune smoke-train (the gate) | LEAD | **PASS** | 2 | MPS LoRA trains: loss 3.53->0.03/60 steps, ~0.2s/step, adapter save+reload+generate OK. Primary decision validated; GPT-SoVITS fallback NOT triggered. Script: scripts/finetune_chatterbox_smoke.py |
 | G4 | Phase 2 — recording kit + ingest/train pipeline | team | DONE | 2 | kit + finetune/dataset.py ingest of manifest.tsv+NNN audio |
 | G5 | Phase 2 — HUMAN HAND-OFF: scripts delivered to owner | LEAD | DELIVERED | 1 | recording-scripts/README.md; awaiting owner audio (non-blocking) |
-| G6 | Phase 3 — finetune pipeline + LoRA-aware engine integration | team | DONE | 1 | src/chinai/finetune/; `chinai train`; engine lora_path kwarg; 63 tests green |
+| G6 | Phase 3 — finetune pipeline + LoRA-aware engine integration | team | DONE | 1 | src/chinai/finetune/; `double-chin train`; engine lora_path kwarg; 63 tests green |
 | G7 | Phase 3 — prosody controls (pause/emphasis markup + rate) | team | DONE | 1 | src/chinai/prosody.py; --rate; UI slider; 89 tests green |
 | G8 | Phase 4 — indistinguishability gate + real-voice run | team | DONE | 2 | gate PASS 0.822 on owner's fine-tuned voice (near-indistinguishable) |
-| G9 | Phase 5 — docs + ship PR | LEAD | DONE | 1 | PR #2 open: github.com/MattModeCode/ChinAI/pull/2 |
+| G9 | Phase 5 — docs + ship PR | LEAD | DONE | 1 | PR #2 open: github.com/MattModeCode/Double Chin/pull/2 |
 
 ## Decisions (append-only)
 - D0 (2026-07-17): Backend boundary = local + free + Apple-Silicon only (owner's call: no
@@ -77,7 +77,7 @@ Load-bearing MPS gotchas for the real fine-tune (from scripts/finetune_chatterbo
 - don't use T3.loss(); compute next-token CE: speech_logits[:,:-1] vs speech_tokens[:,1:].
 - target speech seq = S3 tokens wrapped with start=6561 / stop=6562.
 NEXT: G6 build src/chinai/finetune/ (ingest manifest.tsv+NNN.wav -> dataset; train() using the
-above), a `chinai train` CLI command, and engine loads a voice's LoRA adapter if present (else
+above), a `double-chin train` CLI command, and engine loads a voice's LoRA adapter if present (else
 zero-shot). Testable now with stand-in voices; real fine-tune runs on owner's audio.
 
 
@@ -86,19 +86,19 @@ All work buildable WITHOUT the owner's audio is DONE, tested (107 offline green 
 gated real MPS fine-tune), and shipped as PR #2. Backend fully integrated behind the
 existing engine interface; prosody controls + indistinguishability gate added.
 The ONLY remaining step (the mission's one legitimate pause): owner records
-recording-scripts/001..079 -> `chinai train me <dir> --manifest recording-scripts/manifest.tsv`
--> `chinai gate me` must clear 0.70. That real fine-tune + gate is G8-final, and it
+recording-scripts/001..079 -> `double-chin train me <dir> --manifest recording-scripts/manifest.tsv`
+-> `double-chin gate me` must clear 0.70. That real fine-tune + gate is G8-final, and it
 needs the owner's real audio which does not exist yet.
 Resume after audio: run `/goal` (or just the 3 commands above).
 
 
 ## MISSION COMPLETE (2026-07-18) — real fine-tune on owner's voice PASSED
-Owner recorded 79 takes (~32 min) -> enrolled 'owner' -> `chinai train owner` (10 epochs,
-670 steps, MPS, ~loss 3.5->0.4) -> `chinai gate owner`:
+Owner recorded 79 takes (~32 min) -> enrolled 'owner' -> `double-chin train owner` (10 epochs,
+670 steps, MPS, ~loss 3.5->0.4) -> `double-chin gate owner`:
   **PASS score 0.822 (threshold 0.70) — near-indistinguishable.**
   speaker_similarity 0.831 (cosine 0.849) | discrimination 0.667 (clf acc 0.67) |
   naturalness 0.999 [proxy] | prosody 0.822.
-Voice is live: `chinai say "..." --voice owner` (adapter auto-applied) + Studio UI.
+Voice is live: `double-chin say "..." --voice owner` (adapter auto-applied) + Studio UI.
 Headroom to top band (>=0.85 "indistinguishable"): discrimination is the weak axis
 (clone still separable above chance) -> more/cleaner audio (32min vs 48 target) and/or
 the planned RVC re-timbre stage-2 pass. Owner's cloned audio kept LOCAL (not committed).

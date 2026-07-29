@@ -9,7 +9,7 @@ Usage:
     .venv/bin/python demo/make_voice_passport.py VOICE_NAME OUT.html \
         [--score 0.921] [--score-label "vs holdout, via Studio"]
 
-Reads the voice's meta.json from CHINAI_HOME (default ~/.chinai); pass a
+Reads the voice's meta.json from DOUBLECHIN_HOME (default ~/.double-chin); pass a
 measured similarity score to stamp it on the card.
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from chinai.config import voices_dir
+from double_chin.config import voices_dir
 
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -63,11 +63,11 @@ PAGE = """<!doctype html>
     <dt>verification</dt><dd>{verification}</dd>
     <dt>engine</dt><dd>Chatterbox TTS 0.5B (MIT) · zero-shot conditioning, never trained on this voice</dd>
     <dt>watermark</dt><dd>Resemble Perth on every output — provenance signal, not a control</dd>
-    <dt>storage</dt><dd>this machine only: CHINAI_HOME/voices/{name}/</dd>
+    <dt>storage</dt><dd>this machine only: DOUBLECHIN_HOME/voices/{name}/</dd>
   </dl>
   <div class="foot">
     <p>Deleting the voice folder revokes this voice entirely; no model weights remember it.</p>
-    <p>Clone only a voice you have the right to clone. Issued {issued} by ChinAI.</p>
+    <p>Clone only a voice you have the right to clone. Issued {issued} by Double Chin.</p>
   </div>
 </div>
 </body></html>

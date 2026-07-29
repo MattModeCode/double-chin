@@ -1,4 +1,4 @@
-# Decision record — ChinAI voice backend (2026-07-17)
+# Decision record — Double Chin voice backend (2026-07-17)
 
 Synthesized by the lead from the Phase-0 research (12 models) + Phase-1 champion/skeptic
 tournament (raw data: `.goal/research/`). The final `decision` workflow agent crashed on
@@ -28,7 +28,7 @@ contract):
    Chinese-optimized with *documented residual artifacts on English* (skeptic brief +
    research). For an *indistinguishable* English clone that is a direct hit to the one metric
    that matters most. Chatterbox is English-native.
-2. **Smallest integration delta / invariant preservation.** ChinAI's entire engine, enroll,
+2. **Smallest integration delta / invariant preservation.** Double Chin's entire engine, enroll,
    Studio, tests, `doctor`, and the mandatory **Perth watermark** are already built around
    Chatterbox (`src/chinai/engine.py:71`). Fine-tuning Chatterbox keeps every mission
    invariant intact and makes the "keep the app fully integrated" DoD nearly free. GPT-SoVITS

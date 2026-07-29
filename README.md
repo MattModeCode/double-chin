@@ -1,10 +1,25 @@
-# ChinAI
+# Double Chin
 
 Your voice, on script.
 
-ChinAI is a local voice-cloning application. Give it a text script and a few seconds of someone's voice, and it reads the script aloud in that voice — entirely on your machine. No cloud, no account, no audio leaving the laptop. One command launches **ChinAI**, the web interface where you enroll voices, type or load a script, watch it synthesize chunk by chunk, and hear the result with a speaker-similarity verdict; the same pipeline is also scriptable from the `chinai` CLI.
+Double Chin is a local voice-cloning application. Give it a few minutes of someone's voice and a text script, and it reads the script aloud in that voice — entirely on your machine. No cloud, no account, no audio leaving the laptop. One command opens the app: pick a voice, paste a script, hit Generate, and watch it synthesize chunk by chunk with a live speaker-similarity verdict on every take.
 
-**The proof:** a cloned single sentence scored **0.902** and a full 39 s script **0.954** cosine similarity against the reference voice, on a separate speaker-verification model (resemblyzer — different weights, same GE2E family as the engine's conditioning). Negative controls: a *different* real speaker scores 0.672–0.713 on the same metric, so the clone sits far above the wrong-speaker floor. Method, caveats, and full numbers: [docs/design.md §7](docs/design.md). Hear it: [`demo/`](demo/). Try to spot it: [`demo/mirror-test.html`](demo/mirror-test.html).
+![Double Chin Studio](demo/studio/double-chin-studio-demo.gif)
+
+Watch a real session, script to spoken take: [`demo/double-chin-studio-demo.mp4`](demo/double-chin-studio-demo.mp4).
+
+## Hear it
+
+These are real clips of the owner's voice, cloned by Double Chin from a fine-tuned local model — nothing here is a recording:
+
+- 🔊 [`demo/owner_finetuned_demo.wav`](demo/owner_finetuned_demo.wav) — 17.8s
+- 🔊 [`demo/examples/example-1.mp3`](demo/examples/example-1.mp3) — 8.4s
+- 🔊 [`demo/examples/example-2.mp3`](demo/examples/example-2.mp3) — 7.4s
+- 🔊 [`demo/examples/example-3.mp3`](demo/examples/example-3.mp3) — 7.0s
+- 🔊 [`demo/examples/example-4.mp3`](demo/examples/example-4.mp3) — 8.9s
+- 🔊 [`demo/examples/example-5.mp3`](demo/examples/example-5.mp3) — 7.0s
+
+Each one verifies against a held-out reference clip the model never saw. The underlying voice — the reference audio, the fine-tuned adapter — never leaves this machine and isn't in this repo; only these generated clips are. Full method and numbers: [`.goal/ledger.md`](.goal/ledger.md) (gate **PASS 0.822**, near-indistinguishable, threshold 0.70).
 
 ## Requirements
 
@@ -15,123 +30,26 @@ ChinAI is a local voice-cloning application. Give it a text script and a few sec
 ## Setup
 
 ```bash
-git clone <this-repo> && cd ChinAI
+git clone <this-repo> && cd double-chin
 uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python -e ".[dev]"
 source .venv/bin/activate
-chinai doctor          # checks device, deps, disk — everything should PASS
+double-chin doctor          # checks device, deps, disk — everything should PASS
+double-chin studio          # starts http://127.0.0.1:8787 and opens your browser
 ```
-
-## The application
-
-```bash
-chinai studio          # starts http://127.0.0.1:8787 and opens your browser
-```
-
-![ChinAI after a verified generation](demo/studio/05-done.png)
-
-Everything happens in one screen: pick an enrolled voice (or enroll one by uploading recordings), paste a script or load a `.txt`, tune delivery (exaggeration / reference adherence / temperature / seed), and Generate. Progress streams live — you watch each chunk land as it's synthesized — then the take auto-plays with its similarity score and verdict, and every generation is kept in a browsable, replayable history under `~/.chinai/studio/`. The server binds to 127.0.0.1 only and a same-origin guard rejects cross-origin and rebound-host requests — Studio has no auth layer, so it refuses anything but the local page (the fix a red team's CSRF/DNS-rebinding finding forced; see [docs/red-team.md](docs/red-team.md)). Watch it run: [`demo/chinai-studio-demo.mp4`](demo/chinai-studio-demo.mp4) — a real session recorded through the interface, ending with the audio that session generated (0.921 vs holdout).
-
-Studio doubles as a local HTTP API (`/api/voices`, `/api/jobs`, SSE progress at `/api/jobs/{id}/events`, `/api/history`, `/api/audio/{id}`) — see [docs/design.md §10](docs/design.md) for the surface and the job model.
-
-## First clone (60 seconds, stand-in voice)
-
-The repo ships a licence-safe stand-in voice so you can watch the pipeline work before recording anything:
-
-```bash
-chinai enroll standin demo/assets/arctic_0001.wav demo/assets/arctic_0002.wav \
-  demo/assets/arctic_0003.wav demo/assets/arctic_0005.wav \
-  demo/assets/arctic_0008.wav demo/assets/ref_a.wav
-chinai say "The mirror test is simple: if this sounds like the reference, it works." \
-  --voice standin -o first-clone.wav --verify
-afplay first-clone.wav
-```
-
-First run loads ~6 GB of weights; after that the model loads in under 10 seconds.
 
 ## Clone your own voice
 
-### Quick path (zero-shot, 60 seconds of audio)
-
-Follow the 15-minute [recording kit](docs/recording-scripts.md) — Rainbow Passage + Harvard sentences — then:
+Record the [79-take corpus](recording-scripts/) (~50 minutes), then:
 
 ```bash
-chinai enroll me ~/Desktop/my-voice/
-chinai say --script your-script.txt --voice me -o out.wav --verify
+double-chin enroll yourvoice path/to/recordings/
+double-chin train yourvoice path/to/recordings/ --manifest path/to/recordings/manifest.tsv
+double-chin say "Hello, world." --voice yourvoice -o out.wav --verify
 ```
 
-### Indistinguishable path (fine-tuned, ~48 minutes of audio)
-
-For a voice the owner cannot distinguish from real, record the [79-take corpus](recording-scripts/) (~50 minutes, diverse phonetics and prosody):
-
-```bash
-# Record: use the provided scripts in recording-scripts/NNN.txt
-# Save audio files as recording-scripts/NNN.m4a / .wav (one per script)
-
-chinai enroll me recording-scripts/  # enroll the quick reference first
-chinai train me recording-scripts/ --manifest recording-scripts/manifest.tsv
-chinai say "Hello, world." --voice me -o out.wav --verify
-```
-
-After `chinai train`, the adapter is cached; `--voice me` auto-loads it. Test the gate:
-
-```bash
-chinai gate me
-```
-
-The gate runs a four-signal suite (speaker discrimination, leave-one-out naturalness proxy, prosody similarity, and a synthesized-vs-real ABX component). It prints a verdict: pass ≥0.70 composite score.
-
-## CLI
-
-| Command | Does |
-|---|---|
-| `chinai studio` | Launch the ChinAI application (`--port`, `--no-browser`) |
-| `chinai enroll NAME SRC...` | Build a voice from recordings (wav/m4a/mp3/flac; files or a folder) |
-| `chinai say TEXT \| --script FILE` | Synthesize speech; `--voice NAME` or `--ref WAV`; `-o OUT.wav` |
-| `chinai train NAME RECORDINGS_DIR` | Fine-tune a LoRA adapter on a directory of recordings + manifest.tsv |
-| `chinai voices` | List enrolled voices (shows which have adapters) |
-| `chinai gate [VOICE]` | Run the indistinguishability suite (speaker, naturalness, prosody); emit a pass/fail verdict |
-| `chinai verify A.wav B.wav` | Speaker-similarity score + verdict between any two clips |
-| `chinai doctor` | Environment health check (offline) |
-
-Useful `say` flags: `--voice NAME` auto-uses any trained adapter; `--verify` (score against held-out or reference), `--seed N` (reproducible takes), `--rate 0.5..2.0` (pitch-preserving speaking-rate time-stretch), `--exaggeration 0..1` (emotion), `--cfg 0..1` (reference adherence), `--temperature`, `--device mps|cuda|cpu`.
-
-Know what `--verify` measures: it scores *who* the output sounds like, not *what* was said or whether it is intelligible. A wrong-words render in the right timbre would still score high; listen to your outputs.
-
-## How it works
-
-ChinAI runs [Chatterbox TTS](https://github.com/resemble-ai/chatterbox) (MIT, 0.5B params, native to Apple Silicon) in two modes:
-
-**Zero-shot (fast, reference-based).** The engine conditions on your reference clip and generates speech in that voice — no training required. Enrolment just assembles your best reference audio. Instantly reversible, no GPU-hours.
-
-**Fine-tuned (accurate, locally trained).** For an indistinguishable clone, record ~48 minutes using the [recording-scripts/](recording-scripts/) kit and run `chinai train` to fine-tune a LoRA adapter on your voice's cadence and prosody. The adapter runs on Apple Silicon (MPS) and costs nothing; smoke-tested at ~20–40 minutes per training run. The zero-shot path remains the fallback.
-
-Both paths synthesize scripts split into sentence-aware chunks on Apple's GPU (MPS), stitch with natural pauses and prosody markup, and optionally verify with [resemblyzer](https://github.com/resemble-ai/Resemblyzer) speaker embeddings. Full architecture, decision rationale, and tradeoffs: [docs/design.md](docs/design.md).
-
-## Project layout
-
-```
-src/chinai/        the package: cli, engine, chunk, voices, verify, config
-src/chinai/studio/ the application: FastAPI server, jobs, history, static UI
-tests/           unit suite (offline, ~2 s) + slow e2e (CHINAI_E2E=1)
-docs/            design doc, build log, recording kit, red-team report
-demo/            demo scripts, generated audio, videos, UI screenshots
-recap.html       the five-minute tour of everything in this repo
-```
-
-## Tests
-
-```bash
-pytest -m "not slow" -q       # 51 unit tests, offline, ~2 s (engine, CLI, studio API)
-CHINAI_E2E=1 pytest -m slow -q  # real script-to-audio run (loads the model)
-```
-
-The studio tests inject a fake engine through the app factory, so the whole HTTP surface — enrolment upload, job lifecycle, SSE progress stream, 409 concurrency guard, history, audio serving — runs offline in-process.
-
-## Responsible use
-
-ChinAI is built for cloning **your own voice** on your own machine. Be clear-eyed about what that means: enrolment works from as little as 5 seconds of audio, and while every output carries Resemble's [Perth audio watermark](https://github.com/resemble-ai/chatterbox#watermarking) via the engine, that watermark is an invisible provenance signal — it can be weakened by re-encoding and ChinAI ships no detector for it. It is not a control, just a marker. Don't clone a voice you don't have the right to clone. Every enrolled voice can carry a [voice passport](demo/voice-passport-standin.html) — a provenance card stating what it was built from, how it verifies, and that deleting its folder revokes it entirely (`demo/make_voice_passport.py`). Your recordings and voices never leave the machine (the only network use is the one-time model download from Hugging Face); the adversarial review of every claim in this project is in [docs/red-team.md](docs/red-team.md).
+Every enrolled voice lives only in `~/.double-chin/voices/`; deleting that folder revokes it entirely. Don't clone a voice you don't have the right to clone — every output carries an inaudible [Perth watermark](https://github.com/resemble-ai/chatterbox#watermarking), but it's a provenance signal, not a control.
 
 ## Licences
 
-ChinAI's own code: MIT. Engine (Chatterbox code + weights): MIT. Verifier (resemblyzer): Apache 2.0. Stand-in audio (CMU Arctic): free CMU licence. Recording-kit texts: public domain. Inventory: [docs/design.md §9](docs/design.md).
+Double Chin: MIT. Engine ([Chatterbox TTS](https://github.com/resemble-ai/chatterbox)): MIT. Verifier ([resemblyzer](https://github.com/resemble-ai/Resemblyzer)): Apache 2.0.

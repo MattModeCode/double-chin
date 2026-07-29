@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Build dist/ChinAI.app — the self-contained macOS desktop app.
+# Build dist/Double Chin.app — the self-contained macOS desktop app.
 #
 # Usage: bash packaging/build_app.sh
 #
 # The result is ad-hoc signed so it launches on this machine. It is NOT
 # notarized (that needs an Apple Developer ID, out of scope for a personal
 # app) — first launch needs one right-click -> Open to satisfy Gatekeeper,
-# or: xattr -dr com.apple.quarantine dist/ChinAI.app
+# or: xattr -dr com.apple.quarantine dist/Double Chin.app
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -40,9 +40,9 @@ fi
 
 rm -rf build dist
 
-"$VENV_PYTHON" -m PyInstaller packaging/chinai.spec --noconfirm
+"$VENV_PYTHON" -m PyInstaller packaging/double-chin.spec --noconfirm
 
-APP="dist/ChinAI.app"
+APP="dist/Double Chin.app"
 if [ ! -d "$APP" ]; then
   echo "error: build did not produce $APP" >&2
   exit 1

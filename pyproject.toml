@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "chinai"
+name = "double-chin"
 version = "0.1.0"
-description = "ChinAI: a local, standalone voice-cloning app for your own voice"
+description = "Double Chin: a local, standalone voice-cloning app for your own voice"
 requires-python = ">=3.11,<3.13"
 dependencies = [
     "chatterbox-tts",
@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-chinai = "chinai.cli:main"
+double-chin = "double_chin.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest"]
@@ -28,8 +28,8 @@ dev = ["pytest"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "slow: marks tests that require the real Chatterbox model or network access; run with CHINAI_E2E=1",
+    "slow: marks tests that require the real Chatterbox model or network access; run with DOUBLECHIN_E2E=1",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/chinai"]
+packages = ["src/double_chin"]
