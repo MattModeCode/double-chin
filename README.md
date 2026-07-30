@@ -6,20 +6,25 @@ Double Chin is a local voice-cloning application. Give it a few minutes of someo
 
 ![Double Chin Studio](demo/studio/double-chin-studio-demo.gif)
 
-Watch a real session, script to spoken take: [`demo/double-chin-studio-demo.mp4`](demo/double-chin-studio-demo.mp4).
+Watch a real session, script to spoken take:
+
+https://github.com/user-attachments/assets/c634f892-07c8-454f-9c81-ea446cb98faa
 
 ## Hear it
 
-These are real clips of the owner's voice, cloned by Double Chin from a fine-tuned local model — nothing here is a recording:
+Real clips of the owner's voice, cloned by Double Chin from a fine-tuned local model — nothing here is a recording. GitHub doesn't support inline audio players, so each clip below is a static-frame clip carrying the real generated audio track — press play, no download:
 
-- 🔊 [`demo/owner_finetuned_demo.wav`](demo/owner_finetuned_demo.wav) — 17.8s
-- 🔊 [`demo/examples/example-1.mp3`](demo/examples/example-1.mp3) — 8.4s
-- 🔊 [`demo/examples/example-2.mp3`](demo/examples/example-2.mp3) — 7.4s
-- 🔊 [`demo/examples/example-3.mp3`](demo/examples/example-3.mp3) — 7.0s
-- 🔊 [`demo/examples/example-4.mp3`](demo/examples/example-4.mp3) — 8.9s
-- 🔊 [`demo/examples/example-5.mp3`](demo/examples/example-5.mp3) — 7.0s
+https://github.com/user-attachments/assets/f96d3658-2d8f-413d-9aca-d15504a037e2
 
-Each one verifies against a held-out reference clip the model never saw. The underlying voice — the reference audio, the fine-tuned adapter — never leaves this machine and isn't in this repo; only these generated clips are. Full method and numbers: [`.goal/ledger.md`](.goal/ledger.md) (gate **PASS 0.822**, near-indistinguishable, threshold 0.70).
+https://github.com/user-attachments/assets/b0211b0f-7236-49e2-bf2c-ee8a484a1c81
+
+https://github.com/user-attachments/assets/1fdc982a-4d2a-460d-9217-69bc3467c68d
+
+https://github.com/user-attachments/assets/cec0b2f4-6b47-494a-b38a-1b05a76b351e
+
+https://github.com/user-attachments/assets/f9fb50e9-7a2d-4307-8d77-6a95854feded
+
+Each one verifies against a held-out reference clip the model never saw. The underlying voice — the reference audio, the fine-tuned adapter — never leaves this machine and isn't in this repo; only these generated clips are. Raw files: [`demo/owner_finetuned_demo.wav`](demo/owner_finetuned_demo.wav), [`demo/examples/`](demo/examples/). Full method and numbers: [`.goal/ledger.md`](.goal/ledger.md) (gate **PASS 0.822**, near-indistinguishable, threshold 0.70).
 
 ## Requirements
 
