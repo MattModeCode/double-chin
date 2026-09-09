@@ -95,9 +95,9 @@ class TestLaunchBackgroundColor:
         tokens = (
             Path(double_chin.__file__).parent / "studio" / "static" / "tokens.css"
         ).read_text()
-        canvases = re.findall(r"--canvas:\s*(#[0-9A-Fa-f]{6});", tokens)
+        canvases = re.findall(r"--bg-grouped:\s*(#[0-9A-Fa-f]{6});", tokens)
 
         assert canvases == [_LAUNCH_COLOR_LIGHT, _LAUNCH_COLOR_DARK], (
-            "tokens.css --canvas values drifted from desktop.py's launch colours; "
+            "tokens.css --bg-grouped values drifted from desktop.py's launch colours; "
             f"css has {canvases}"
         )

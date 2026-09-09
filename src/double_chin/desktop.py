@@ -21,10 +21,10 @@ import uvicorn
 _PREFERRED_PORT = 8787
 # The window paints its background colour before the page has loaded. Left at
 # pywebview's white default that is a bright flash on the way into a dark
-# interface, so both values below mirror `--canvas` in studio/static/tokens.css
-# — a test asserts they stay in step.
-_LAUNCH_COLOR_LIGHT = "#E9E8F0"
-_LAUNCH_COLOR_DARK = "#14141D"
+# interface, so both values below mirror `--bg-grouped` in
+# studio/static/tokens.css — a test asserts they stay in step.
+_LAUNCH_COLOR_LIGHT = "#F2F2F7"
+_LAUNCH_COLOR_DARK = "#1C1C1E"
 _APPEARANCE_TIMEOUT_SECONDS = 2.0
 _STARTUP_TIMEOUT_SECONDS = 15.0
 _STARTUP_POLL_SECONDS = 0.05
@@ -148,9 +148,9 @@ def run() -> int:
     window = webview.create_window(
         "Double Chin",
         f"http://127.0.0.1:{port}",
-        width=1000,
-        height=820,
-        min_size=(560, 520),
+        width=820,
+        height=860,
+        min_size=(520, 480),
         background_color=_launch_background_color(),
     )
     window.events.closed += lambda: setattr(server, "should_exit", True)

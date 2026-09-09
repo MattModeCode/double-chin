@@ -81,6 +81,7 @@ async function refreshVoice(preferName) {
   state.voice = voices.find((voice) => voice.name === wanted) ?? voices[0] ?? null;
   if (state.voice) storeVoice(state.voice.name);
 
+  $("toolbar-voice").textContent = state.voice ? state.voice.name : "No voice";
   renderVoicePicker(voices);
   renderVoiceCard();
   renderIdle();

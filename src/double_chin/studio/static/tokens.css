@@ -1,203 +1,176 @@
-/* Double Chin — Apple Liquid Glass design tokens.
+/* Double Chin — Apple design system.
  *
- * Light is the base definition; the dark block redefines only what actually
- * changes, so no colour is ever defined solely inside a media query. Glass is
- * tuned per appearance rather than one palette dimmed — translucency is where
- * contrast usually dies, so every text token below clears 4.5:1 against the
- * material it is used on. Tertiary is placeholder/disabled only.
+ * Values are AppKit/UIKit semantic colours, not invented ones. Two deliberate
+ * departures, both noted inline: the secondary label alpha is raised because
+ * Apple's own value fails WCAG AA for small text, and the accent has a defined
+ * pressed shade rather than a brightness filter.
+ *
+ * There is no decorative background anywhere in this file. Apple's materials
+ * blur the app's own content as it scrolls beneath them; a synthetic gradient
+ * behind the glass is the thing that makes translucency look fake.
  */
 
 :root{
   color-scheme: light dark;
 
-  /* ---------- type ---------- */
+  /* ---------- type ----------
+   * SF via -apple-system. macOS body text is 13px, secondary 11px.
+   */
   --font-ui:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
     system-ui, sans-serif;
   --font-num:
     ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 
-  --text-xs: 11px;
-  --text-sm: 12px;
-  --text-base: 13px;
-  --text-md: 15px;
-  --text-lg: 17px;
-  --text-xl: 21px;
+  --text-caption: 10px;
+  --text-small:   11px;
+  --text-callout: 12px;
+  --text-body:    13px;
+  --text-title3:  15px;
+  --text-title2:  17px;
 
-  --tracking-tight: -0.014em;
-  --tracking-wide: 0.06em;
+  --weight-regular: 400;
+  --weight-medium:  500;
+  --weight-semibold: 600;
 
-  /* ---------- ink ---------- */
-  --ink:           rgba(0,0,0,.88);
-  --ink-secondary: rgba(0,0,0,.58);
-  --ink-tertiary:  rgba(0,0,0,.42);
+  /* SF tightens optically as it grows; these match Apple's tracking table
+   * closely enough at the two sizes that carry headings. */
+  --tracking-body:  -0.006em;
+  --tracking-title: -0.014em;
+  --tracking-caps:   0.055em;
 
-  --accent:        #007AFF;
-  --accent-ink:    #ffffff;
-  --accent-soft:   rgba(0,122,255,.14);
-  --ok:            #248A3D;
-  --warn:          #B25000;
-  --err:           #D70015;
-
-  /* ---------- ambient canvas ----------
-   * The glass needs something to refract. These pools drift slowly behind
-   * every panel; without them "translucent" just reads as "grey".
+  /* ---------- backgrounds ----------
+   * Apple's grouped-content system: a recessed page, opaque cards on top.
    */
-  --canvas:  #E9E8F0;
-  --amb-1: rgba(116,168,255,.66);
-  --amb-2: rgba(198,160,255,.60);
-  --amb-3: rgba(255,182,146,.52);
-  --amb-4: rgba(146,226,204,.52);
-  --amb-5: rgba(255,255,255,.50);
+  --bg-grouped:   #F2F2F7;
+  --bg-surface:   #FFFFFF;
+  --bg-inset:     #FFFFFF;
 
-  /* ---------- glass ---------- */
-  --glass:          rgba(255,255,255,.62);
-  --glass-elevated: rgba(255,255,255,.78);
-  --glass-bar:      rgba(255,255,255,.58);
-  --glass-control:  rgba(255,255,255,.58);
-  --glass-hover:    rgba(255,255,255,.82);
-  --glass-pressed:  rgba(255,255,255,.44);
-  --glass-sunken:   rgba(255,255,255,.34);
-  --glass-scrim:    rgba(40,40,50,.28);
+  /* Fills, for tracks and unemphasized control backgrounds. */
+  --fill-secondary: rgba(120,120,128,.16);
+  --fill-tertiary:  rgba(120,120,128,.12);
+  --fill-quaternary:rgba(120,120,128,.08);
 
-  /* Specular edge: a bright top lip and a soft bottom shade are what make a
-   * flat rectangle read as a physical pane. */
-  --edge-top:    rgba(255,255,255,.85);
-  --edge-bottom: rgba(0,0,0,.06);
-  --hairline:    rgba(0,0,0,.10);
-  --hairline-soft: rgba(0,0,0,.06);
+  /* ---------- labels ---------- */
+  --label:          rgba(0,0,0,.92);
+  /* Apple's secondaryLabel is rgba(60,60,67,.60), which measures 3.5:1 on
+   * white and fails AA for text this size. Raised until it clears 4.5:1. */
+  --label-secondary: rgba(60,60,67,.74);
+  --label-tertiary:  rgba(60,60,67,.42);
 
-  --blur-panel: 30px;
-  --blur-bar:   40px;
-  --blur-sheet: 50px;
-  --saturate:   180%;
+  --separator:       rgba(60,60,67,.29);
+  --separator-opaque:#D8D8DC;
 
-  --shadow-card:
-    0 1px 1px rgba(0,0,0,.04),
-    0 8px 24px -10px rgba(0,0,0,.16),
-    0 28px 56px -28px rgba(0,0,0,.20);
-  --shadow-raised:
-    0 1px 1px rgba(0,0,0,.05),
-    0 14px 32px -12px rgba(0,0,0,.22),
-    0 36px 72px -32px rgba(0,0,0,.26);
-  --shadow-sheet:
-    0 2px 4px rgba(0,0,0,.06),
-    0 24px 64px -16px rgba(0,0,0,.34);
+  /* ---------- accent and semantics ---------- */
+  --accent:         #007AFF;
+  --accent-pressed: #0062CC;
+  --accent-label:   #FFFFFF;
+
+  /* systemGreen/Orange/Red, darkened where they sit on white as text. */
+  --green: #248A3D;
+  --orange:#B25000;
+  --red:   #D70015;
+
+  /* ---------- materials ----------
+   * Only chrome uses these: the toolbar, which the page scrolls beneath, and
+   * the sheet, which sits over the page. Nothing else in the app is glass,
+   * because nothing else has anything behind it to show through.
+   */
+  --material-bar:   rgba(246,246,248,.72);
+  --material-sheet: rgba(246,246,248,.86);
+  --material-blur:  20px;
+  --material-sheet-blur: 30px;
+  --material-saturate: 180%;
+  --scrim: rgba(0,0,0,.22);
 
   /* ---------- geometry ---------- */
-  --r-control: 10px;
-  --r-card:    18px;
-  --r-sheet:   22px;
+  --r-control: 8px;
+  --r-card:    12px;
+  --r-sheet:   12px;
   --r-pill:    999px;
 
   --gap-1: 4px;
   --gap-2: 8px;
   --gap-3: 12px;
   --gap-4: 16px;
-  --gap-5: 22px;
-  --gap-6: 30px;
+  --gap-5: 20px;
+  --gap-6: 28px;
 
-  --shell-width: 720px;
+  --shell-width: 680px;
 
-  /* ---------- motion ---------- */
-  --dur-fast: 160ms;
-  --dur:      260ms;
-  --dur-slow: 420ms;
-  --ease-spring: cubic-bezier(.22, 1, .36, 1);
-  --ease-out:    cubic-bezier(.25, .46, .45, .94);
+  /* Cards in a grouped layout carry no shadow — only things that genuinely
+   * float above the window do. */
+  --shadow-sheet: 0 12px 40px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.10);
+  --shadow-knob:  0 1px 3px rgba(0,0,0,.24), 0 0 0 .5px rgba(0,0,0,.08);
+
+  /* ---------- motion ----------
+   * Apple's default UI curve, and its short durations. Nothing drifts,
+   * pulses, or animates on its own.
+   */
+  --dur-fast: 120ms;
+  --dur:      200ms;
+  --ease:     cubic-bezier(.25, .1, .25, 1);
+  --ease-out: cubic-bezier(0, 0, .58, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ink:           rgba(255,255,255,.92);
-    --ink-secondary: rgba(255,255,255,.62);
-    --ink-tertiary:  rgba(255,255,255,.44);
+    --bg-grouped: #1C1C1E;
+    --bg-surface: #2C2C2E;
+    --bg-inset:   #1C1C1E;
 
-    --accent:      #0A84FF;
-    --accent-ink:  #ffffff;
-    --accent-soft: rgba(10,132,255,.22);
-    --ok:          #30D158;
-    --warn:        #FF9F0A;
-    --err:         #FF453A;
+    --fill-secondary: rgba(120,120,128,.36);
+    --fill-tertiary:  rgba(120,120,128,.24);
+    --fill-quaternary:rgba(120,120,128,.18);
 
-    --canvas: #14141D;
-    --amb-1: rgba(48,104,208,.64);
-    --amb-2: rgba(116,66,196,.58);
-    --amb-3: rgba(184,64,104,.44);
-    --amb-4: rgba(24,124,132,.50);
-    --amb-5: rgba(66,74,146,.36);
+    --label:           rgba(255,255,255,.96);
+    --label-secondary: rgba(235,235,245,.64);
+    --label-tertiary:  rgba(235,235,245,.34);
 
-    --glass:          rgba(50,50,62,.52);
-    --glass-elevated: rgba(60,60,74,.68);
-    --glass-bar:      rgba(30,30,40,.60);
-    --glass-control:  rgba(255,255,255,.08);
-    --glass-hover:    rgba(255,255,255,.14);
-    --glass-pressed:  rgba(255,255,255,.05);
-    --glass-sunken:   rgba(0,0,0,.22);
-    --glass-scrim:    rgba(0,0,0,.52);
+    --separator:        rgba(84,84,88,.72);
+    --separator-opaque: #38383A;
 
-    --edge-top:    rgba(255,255,255,.20);
-    --edge-bottom: rgba(0,0,0,.30);
-    --hairline:    rgba(255,255,255,.12);
-    --hairline-soft: rgba(255,255,255,.07);
+    --accent:         #0A84FF;
+    --accent-pressed: #0060D0;
 
-    --shadow-card:
-      0 1px 1px rgba(0,0,0,.30),
-      0 10px 28px -10px rgba(0,0,0,.56),
-      0 30px 60px -28px rgba(0,0,0,.64);
-    --shadow-raised:
-      0 1px 1px rgba(0,0,0,.34),
-      0 16px 36px -12px rgba(0,0,0,.62),
-      0 40px 80px -32px rgba(0,0,0,.70);
-    --shadow-sheet:
-      0 2px 6px rgba(0,0,0,.40),
-      0 28px 72px -16px rgba(0,0,0,.72);
+    --green: #30D158;
+    --orange:#FF9F0A;
+    --red:   #FF453A;
+
+    --material-bar:   rgba(28,28,30,.72);
+    --material-sheet: rgba(38,38,40,.86);
+    --scrim: rgba(0,0,0,.44);
+
+    --shadow-sheet: 0 12px 40px rgba(0,0,0,.56), 0 2px 6px rgba(0,0,0,.36);
+    --shadow-knob:  0 1px 3px rgba(0,0,0,.44), 0 0 0 .5px rgba(0,0,0,.30);
   }
 }
 
-/* Translucency is the first thing to go when the viewer asks for contrast.
- * Both appearances need their own block: whitening the glass without also
- * darkening the ink turns dark mode into white-on-white. */
+/* Increased contrast: Apple drops translucency and firms up separators. */
 @media (prefers-contrast: more) {
   :root{
-    --glass:          rgba(255,255,255,.97);
-    --glass-elevated: rgba(255,255,255,.99);
-    --glass-bar:      rgba(255,255,255,.97);
-    --glass-control:  rgba(255,255,255,.99);
-    --glass-hover:    rgba(238,238,244,.99);
-    --glass-pressed:  rgba(224,224,232,.99);
-    --glass-sunken:   rgba(0,0,0,.06);
-    --hairline:       rgba(0,0,0,.44);
-    --hairline-soft:  rgba(0,0,0,.24);
-    --edge-top:       rgba(255,255,255,.60);
-    --edge-bottom:    rgba(0,0,0,.10);
-    --ink:            rgba(0,0,0,.95);
-    --ink-secondary:  rgba(0,0,0,.76);
-    --ink-tertiary:   rgba(0,0,0,.58);
-    --accent:         #0040DD;
-    --blur-panel: 0px; --blur-bar: 0px; --blur-sheet: 0px;
+    --material-bar:   #F2F2F7;
+    --material-sheet: #FFFFFF;
+    --material-blur: 0px;
+    --material-sheet-blur: 0px;
+    --label:           rgba(0,0,0,1);
+    --label-secondary: rgba(0,0,0,.84);
+    --label-tertiary:  rgba(0,0,0,.62);
+    --separator:       rgba(0,0,0,.52);
+    --fill-secondary:  rgba(120,120,128,.34);
+    --accent:          #0040DD;
   }
 }
 
 @media (prefers-contrast: more) and (prefers-color-scheme: dark) {
   :root{
-    --glass:          rgba(14,14,20,.97);
-    --glass-elevated: rgba(22,22,30,.99);
-    --glass-bar:      rgba(10,10,16,.97);
-    --glass-control:  rgba(255,255,255,.16);
-    --glass-hover:    rgba(255,255,255,.24);
-    --glass-pressed:  rgba(255,255,255,.10);
-    --glass-sunken:   rgba(0,0,0,.50);
-    --hairline:       rgba(255,255,255,.48);
-    --hairline-soft:  rgba(255,255,255,.28);
-    --edge-top:       rgba(255,255,255,.34);
-    --edge-bottom:    rgba(0,0,0,.50);
-    --ink:            rgba(255,255,255,.98);
-    --ink-secondary:  rgba(255,255,255,.82);
-    --ink-tertiary:   rgba(255,255,255,.64);
-    /* A brighter accent needs dark text on it, or the primary button loses
-     * the contrast this whole block exists to raise. */
-    --accent:         #66B2FF;
-    --accent-ink:     #06121F;
+    --material-bar:   #1C1C1E;
+    --material-sheet: #2C2C2E;
+    --label:           rgba(255,255,255,1);
+    --label-secondary: rgba(255,255,255,.88);
+    --label-tertiary:  rgba(255,255,255,.66);
+    --separator:       rgba(255,255,255,.56);
+    --accent:          #4CA6FF;
+    --accent-label:    #001022;
   }
 }
