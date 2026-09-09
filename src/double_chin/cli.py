@@ -22,7 +22,7 @@ from double_chin.engine import (
 # ahead of these, so `double-chin verify` (arbitrary wav files, no storage) and
 # argparse-level exits (--help, unknown/missing command) never trigger it.
 _STORAGE_COMMANDS = frozenset(
-    {"enroll", "say", "train", "voices", "doctor", "studio", "app", "gate"}
+    {"enroll", "say", "train", "voices", "doctor", "studio", "app", "gate", "tune"}
 )
 
 # Default script synthesized for `double-chin gate VOICE` when no clone clips are
@@ -140,6 +140,47 @@ def build_parser() -> argparse.ArgumentParser:
     gate_parser.add_argument("--device", default=None, help="Force a device (mps/cuda/cpu).")
     gate_parser.add_argument(
         "--json", action="store_true", help="Emit the raw result dict as JSON."
+    )
+
+    tune_parser = subparsers.add_parser(
+        "tune",
+        help=(
+            "Search the four delivery knobs for the values that score best "
+            "against your own recordings, and print the winner."
+        ),
+    )
+    tune_parser.add_argument("name", help="Name of an already-enrolled voice.")
+    tune_parser.add_argument(
+        "--real-dir", type=Path, required=True,
+        help="Directory of genuine recordings to score against.",
+    )
+    tune_parser.add_argument(
+        "--takes", type=int, default=3,
+        help="Clips synthesized per candidate (default: 3).",
+    )
+    tune_parser.add_argument(
+        "--budget", type=int, default=240,
+        help=(
+            "Stop after this many syntheses and report the best so far. "
+            "Counted across resumes, since the ledger persists."
+        ),
+    )
+    tune_parser.add_argument(
+        "--passes", type=int, default=2, help="Coordinate-descent passes (default: 2)."
+    )
+    tune_parser.add_argument(
+        "--work-dir", type=Path, default=None,
+        help="Where takes and the resumable ledger live (default: <home>/tuning).",
+    )
+    tune_parser.add_argument(
+        "--write-defaults", action="store_true",
+        help="Save the winner as the defaults Studio opens with.",
+    )
+    tune_parser.add_argument(
+        "--device", default=None, help="Force a device (mps/cuda/cpu)."
+    )
+    tune_parser.add_argument(
+        "--json", action="store_true", help="Emit the full result as JSON."
     )
 
     subparsers.add_parser("doctor", help="Report environment diagnostics.")
@@ -355,6 +396,81 @@ def _cmd_gate(args: argparse.Namespace) -> int:
     return 0 if result["passed"] else 1
 
 
+def _cmd_tune(args: argparse.Namespace) -> int:
+    import json
+
+    from double_chin.config import double_chin_home
+    from double_chin.delivery import NEUTRAL_PROFILE, save_defaults
+    from double_chin.tuning import run_sweep, score
+    from double_chin.tuning.runner import (
+        build_context,
+        delivery_objective,
+        format_report,
+        prepare_sets,
+    )
+    from double_chin.tuning.scripts import TUNING_SCRIPTS
+    from double_chin.voices import get_voice
+
+    voice = get_voice(args.name)
+    work_dir = args.work_dir or (double_chin_home() / "tuning" / voice.name)
+
+    print(f"double-chin: preparing real clips from {args.real_dir}", file=sys.stderr)
+    tuning_clips, holdout_clips = prepare_sets(args.real_dir, work_dir)
+
+    def on_event(kind: str, data: dict) -> None:
+        if kind == "scored":
+            values = " ".join(f"{k}={v:g}" for k, v in data["profile"].items())
+            print(
+                f"  obj {delivery_objective(data):.4f}  gate {data['score']:.3f}  "
+                f"{values}",
+                file=sys.stderr,
+            )
+
+    ctx = build_context(
+        voice=voice,
+        real_clips=tuning_clips,
+        scripts=TUNING_SCRIPTS,
+        work_dir=work_dir,
+        takes=args.takes,
+        budget=args.budget,
+        device=args.device,
+        on_event=on_event,
+    )
+    result = run_sweep(ctx, start=NEUTRAL_PROFILE, script_id="tuning", passes=args.passes)
+
+    # Re-score winner and baseline on the held-out script and the held-out
+    # real clips: the only check that the winner is not overfit to one passage.
+    ctx.real_clips = holdout_clips
+    ctx.budget = None
+    holdout = {
+        "best": delivery_objective(score(ctx, result.best, "holdout")),
+        "baseline": delivery_objective(score(ctx, result.baseline, "holdout")),
+    }
+
+    if args.json:
+        print(json.dumps(
+            {
+                "best": result.best.as_dict(),
+                "best_score": result.best_score,
+                "baseline": result.baseline.as_dict(),
+                "baseline_score": result.baseline_score,
+                "noise_floor": result.noise_floor,
+                "beats_noise": result.beats_noise,
+                "holdout": holdout,
+                "synthesis_count": result.synthesis_count,
+            },
+            indent=2,
+        ))
+    else:
+        print(format_report(result, holdout))
+
+    if args.write_defaults:
+        path = save_defaults(result.best)
+        print(f"\nSaved as the opening defaults: {path}")
+
+    return 0
+
+
 def _which_in(directories: list[str], name: str) -> str | None:
     for directory in directories:
         candidate = Path(directory) / name
@@ -453,6 +569,7 @@ _HANDLERS = {
     "voices": _cmd_voices,
     "verify": _cmd_verify,
     "gate": _cmd_gate,
+    "tune": _cmd_tune,
     "doctor": _cmd_doctor,
     "studio": _cmd_studio,
     "app": _cmd_app,

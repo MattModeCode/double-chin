@@ -148,7 +148,12 @@ body{
   border-top: .5px solid var(--separator);
 }
 
-.disc-foot{ display: flex; justify-content: flex-end; padding-top: var(--gap-2); }
+/* Two actions now: "Match my voice" restores the tuned profile, "Reset to
+   neutral" goes back to Chatterbox's own baseline. */
+.disc-foot{
+  display: flex; justify-content: flex-end; gap: var(--gap-4);
+  padding-top: var(--gap-2);
+}
 
 /* ---------- knobs ---------- */
 .knob{ padding: var(--gap-3) 0 var(--gap-2); }

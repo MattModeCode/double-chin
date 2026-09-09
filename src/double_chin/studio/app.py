@@ -242,6 +242,23 @@ def create_app(
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    @app.get("/api/delivery")
+    def get_delivery():
+        """The delivery values the page opens with, and the neutral baseline.
+
+        `defaults` is what the sliders hydrate from and what "Match my voice"
+        restores — the tuned profile, or whatever `tune --write-defaults`
+        saved over it. `neutral` is Chatterbox's own baseline, what "Reset"
+        returns to. Both live server-side so the frontend never hardcodes a
+        number.
+        """
+        from double_chin.delivery import NEUTRAL_PROFILE, load_defaults
+
+        return {
+            "defaults": load_defaults().as_dict(),
+            "neutral": NEUTRAL_PROFILE.as_dict(),
+        }
+
     @app.get("/api/history")
     def get_history():
         records = history.read_history()

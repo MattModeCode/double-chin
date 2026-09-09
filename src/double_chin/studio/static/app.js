@@ -18,9 +18,21 @@ import {
   verdictTone,
 } from "./format.js";
 
-const DELIVERY_DEFAULTS = Object.freeze({
+/* Slider id -> the delivery field it carries. The values are deliberately not
+ * hardcoded here: /api/delivery is the single source of truth for what the
+ * page opens with and for the two presets. PLACEHOLDER_PROFILE only mirrors
+ * the `value=` attributes in the HTML, for the moment before that fetch
+ * lands (or if it fails outright). */
+const KNOB_FIELDS = Object.freeze({
+  exaggeration: "exaggeration",
+  cfg: "cfg_weight",
+  temperature: "temperature",
+  rate: "rate",
+});
+
+const PLACEHOLDER_PROFILE = Object.freeze({
   exaggeration: 0.5,
-  cfg: 0.5,
+  cfg_weight: 0.5,
   temperature: 0.8,
   rate: 1,
 });
@@ -53,6 +65,7 @@ function storeVoice(name) {
 }
 
 const state = {
+  presets: { defaults: PLACEHOLDER_PROFILE, neutral: PLACEHOLDER_PROFILE },
   voice: null,
   jobRunning: false,
   eventSource: null,
@@ -64,9 +77,13 @@ const state = {
 
 async function init() {
   wireControls();
-  syncDelivery();
   updateScriptStats();
-  await Promise.allSettled([refreshVoice(), refreshEnvironment(), refreshHistory()]);
+  await Promise.allSettled([
+    refreshDelivery(),
+    refreshVoice(),
+    refreshEnvironment(),
+    refreshHistory(),
+  ]);
 }
 
 /* ---------- voice ---------- */
@@ -214,14 +231,15 @@ function knobValue(id) {
 
 /** Keeps the range fills, the numeric outputs, and the collapsed summary in step. */
 function syncDelivery() {
+  const opening = state.presets.defaults;
   const changed = [];
-  for (const [id, fallback] of Object.entries(DELIVERY_DEFAULTS)) {
+  for (const [id, field] of Object.entries(KNOB_FIELDS)) {
     const input = $(id);
     setRangeFill(input);
     const value = knobValue(id);
     const suffix = id === "rate" ? "×" : "";
     $(`${id}-val`).textContent = `${value.toFixed(2)}${suffix}`;
-    if (Math.abs(value - fallback) > 1e-9) {
+    if (Math.abs(value - opening[field]) > 1e-9) {
       changed.push(`${KNOB_LABELS[id]} ${value.toFixed(2)}${suffix}`);
     }
   }
@@ -230,12 +248,32 @@ function syncDelivery() {
   $("delivery-summary").textContent = changed.length === 0 ? "Default" : changed.join(" · ");
 }
 
-function resetDelivery() {
-  for (const [id, fallback] of Object.entries(DELIVERY_DEFAULTS)) {
-    $(id).value = String(fallback);
+/** Moves every slider onto `profile`, which is keyed by API field name. */
+function applyProfile(profile) {
+  for (const [id, field] of Object.entries(KNOB_FIELDS)) {
+    $(id).value = String(profile[field]);
   }
+  syncDelivery();
+}
+
+/** Hydrates the sliders from the server rather than the HTML placeholders. */
+async function refreshDelivery() {
+  try {
+    state.presets = await api.delivery();
+  } catch (_) { /* keep the placeholders the page shipped with */ }
+  applyProfile(state.presets.defaults);
+}
+
+/** Back to Chatterbox's own baseline — the untuned starting point. */
+function resetDelivery() {
+  applyProfile(state.presets.neutral);
   $("seed").value = "";
   syncDelivery();
+}
+
+/** Back to the tuned profile the app opens with. */
+function matchMyVoice() {
+  applyProfile(state.presets.defaults);
 }
 
 /* ---------- generate ---------- */
@@ -503,10 +541,11 @@ function wireControls() {
   $("generate").addEventListener("click", generate);
   $("script").addEventListener("input", updateScriptStats);
 
-  for (const id of Object.keys(DELIVERY_DEFAULTS)) {
+  for (const id of Object.keys(KNOB_FIELDS)) {
     $(id).addEventListener("input", syncDelivery);
   }
   $("seed").addEventListener("input", syncDelivery);
+  $("match-voice").addEventListener("click", matchMyVoice);
   $("reset-delivery").addEventListener("click", resetDelivery);
 
   $("script-file").addEventListener("change", async () => {
