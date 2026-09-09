@@ -13,7 +13,17 @@ Covers the two bugs fixed in the desktop shell:
 
 from __future__ import annotations
 
-from double_chin.desktop import _acquire_single_instance_lock, _is_multiprocessing_child
+import re
+from pathlib import Path
+
+import double_chin
+from double_chin.desktop import (
+    _LAUNCH_COLOR_DARK,
+    _LAUNCH_COLOR_LIGHT,
+    _acquire_single_instance_lock,
+    _is_multiprocessing_child,
+    _launch_background_color,
+)
 
 
 def test_genuine_launch_argv_is_not_a_multiprocessing_child():
@@ -65,3 +75,29 @@ def test_single_instance_lock_releases_after_close(tmp_path, monkeypatch):
     assert second is not None
     if hasattr(second, "close"):
         second.close()
+
+
+class TestLaunchBackgroundColor:
+    """The window's pre-paint fill must track the interface's own canvas.
+
+    These are two files that have to agree: `desktop.py` picks the colour the
+    native window shows before the page loads, and `tokens.css` defines the
+    colour the page then paints. When they drift, every launch flashes.
+    """
+
+    def test_dark_appearance_uses_the_dark_launch_colour(self):
+        assert _launch_background_color(prefers_dark=lambda: True) == _LAUNCH_COLOR_DARK
+
+    def test_light_appearance_uses_the_light_launch_colour(self):
+        assert _launch_background_color(prefers_dark=lambda: False) == _LAUNCH_COLOR_LIGHT
+
+    def test_launch_colours_match_the_canvas_tokens_in_css(self):
+        tokens = (
+            Path(double_chin.__file__).parent / "studio" / "static" / "tokens.css"
+        ).read_text()
+        canvases = re.findall(r"--canvas:\s*(#[0-9A-Fa-f]{6});", tokens)
+
+        assert canvases == [_LAUNCH_COLOR_LIGHT, _LAUNCH_COLOR_DARK], (
+            "tokens.css --canvas values drifted from desktop.py's launch colours; "
+            f"css has {canvases}"
+        )

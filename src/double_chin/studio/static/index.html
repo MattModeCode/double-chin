@@ -3,144 +3,222 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Double Chin</title>
+<link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="style.css">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f0e13'/%3E%3Cg fill='%23e1e0e0'%3E%3Crect x='14' y='38' width='5' height='10' rx='2.5'/%3E%3Crect x='23' y='29' width='5' height='19' rx='2.5'/%3E%3Crect x='32' y='16' width='5' height='32' rx='2.5'/%3E%3Crect x='41' y='29' width='5' height='19' rx='2.5'/%3E%3Crect x='50' y='38' width='5' height='10' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230A84FF'/%3E%3Cg fill='%23fff'%3E%3Crect x='14' y='38' width='5' height='10' rx='2.5'/%3E%3Crect x='23' y='29' width='5' height='19' rx='2.5'/%3E%3Crect x='32' y='16' width='5' height='32' rx='2.5'/%3E%3Crect x='41' y='29' width='5' height='19' rx='2.5'/%3E%3Crect x='50' y='38' width='5' height='10' rx='2.5'/%3E%3C/g%3E%3C/svg%3E">
 </head>
 <body>
 
-<header>
-  <div class="brand">
-    <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-    <div>
-      <div class="name">Double Chin</div>
-      <div class="sub">your voice, on script</div>
-    </div>
+<div class="ambient" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="toolbar">
+  <div class="identity">
+    <span class="mark" aria-hidden="true">
+      <svg viewBox="0 0 44 32" fill="currentColor" focusable="false">
+        <rect x="0"  y="11" width="4" height="10" rx="2"/>
+        <rect x="8"  y="6"  width="4" height="20" rx="2"/>
+        <rect x="16" y="0"  width="4" height="32" rx="2"/>
+        <rect x="24" y="6"  width="4" height="20" rx="2"/>
+        <rect x="32" y="11" width="4" height="10" rx="2"/>
+      </svg>
+    </span>
+    <h1>Double Chin</h1>
   </div>
-  <div class="env" id="env" aria-live="polite"></div>
+
+  <div class="toolbar-end">
+    <span class="pill" id="engine-pill" aria-live="polite"></span>
+    <button type="button" class="icon-button" id="settings-open"
+            aria-haspopup="dialog" aria-label="Settings">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <circle cx="10" cy="10" r="2.75"/>
+        <path d="M10 1.9v2.2M10 15.9v2.2M16.7 6l-1.9 1.1M5.2 12.9 3.3 14M16.7 14l-1.9-1.1M5.2 7.1 3.3 6"/>
+      </svg>
+    </button>
+  </div>
 </header>
 
-<main>
-  <section class="panel compose" aria-labelledby="compose-h">
-    <h2 id="compose-h">Script</h2>
+<main class="shell">
 
-    <div class="field">
-      <label for="voice">Voice</label>
-      <div class="voice-row">
-        <select id="voice" aria-describedby="voice-hint"></select>
-        <button type="button" class="ghost" id="enroll-toggle" aria-expanded="false">+ enroll</button>
-      </div>
-      <div class="hint" id="voice-hint"></div>
-    </div>
+  <section class="composer" aria-labelledby="composer-heading">
+    <h2 id="composer-heading" class="sr-only">Script</h2>
+    <label for="script" class="sr-only">Text to speak</label>
+    <textarea id="script" rows="7" spellcheck="false" autofocus
+      placeholder="Write what you want to say."></textarea>
 
-    <form id="enroll-form" class="enroll" hidden>
-      <div class="field">
-        <label for="enroll-name">New voice name</label>
-        <input id="enroll-name" name="name" type="text" pattern="[a-z0-9_\-]{1,40}"
-               placeholder="lowercase letters, digits, - _" required>
-      </div>
-      <div class="field">
-        <label for="enroll-files">Recordings (wav / m4a / mp3 / flac — two or more clips
-          enable held-out verification)</label>
-        <input id="enroll-files" name="files" type="file" multiple
-               accept=".wav,.m4a,.mp3,.flac" required>
-      </div>
-      <div class="row-end">
-        <button type="submit" class="ghost" id="enroll-btn">Enroll voice</button>
-      </div>
-      <div class="hint" id="enroll-status" role="status"></div>
-    </form>
-
-    <div class="field">
-      <label for="script">Text to speak</label>
-      <textarea id="script" rows="9" spellcheck="false"
-        placeholder="Paste or type the script. Blank lines become paragraph pauses."></textarea>
-      <div class="meta-row">
-        <span class="hint" id="script-stats">0 chars</span>
-        <label class="file-load ghost-link" for="script-file">load from file…</label>
+    <div class="composer-foot">
+      <span class="numeric" id="script-stats"></span>
+      <span class="foot-actions">
+        <label class="link" for="script-file">Open file…</label>
         <input type="file" id="script-file" accept=".txt,.md" hidden>
-      </div>
-      <p class="hint prosody-help">
-        Prosody markup:
-        <code>[pause:0.8]</code> or <code>[break]</code> stitch silence ·
-        <code>*word*</code> or <code>[emph]…[/emph]</code> emphasize.
-        Blank lines become paragraph pauses. Unknown tags are ignored, never spoken.
-      </p>
+      </span>
     </div>
+  </section>
 
-    <details class="knobs">
-      <summary>Delivery controls</summary>
-      <div class="knob">
-        <label for="exaggeration">Exaggeration <output id="exaggeration-val">0.5</output></label>
-        <input type="range" id="exaggeration" min="0" max="1" step="0.05" value="0.5">
-        <div class="hint">emotion intensity — 0 flat, 1 theatrical</div>
-      </div>
-      <div class="knob">
-        <label for="cfg">Reference adherence <output id="cfg-val">0.5</output></label>
-        <input type="range" id="cfg" min="0" max="1" step="0.05" value="0.5">
-        <div class="hint">higher sticks closer to the reference delivery</div>
-      </div>
-      <div class="knob">
-        <label for="temperature">Temperature <output id="temperature-val">0.8</output></label>
-        <input type="range" id="temperature" min="0.05" max="2" step="0.05" value="0.8">
-        <div class="hint">variation between takes</div>
-      </div>
-      <div class="knob">
-        <label for="rate">Speaking rate <output id="rate-val">1.00</output>×</label>
-        <input type="range" id="rate" min="0.5" max="2" step="0.05" value="1">
-        <div class="hint">pitch-preserving time-stretch — 1× unchanged, &gt;1 faster</div>
-      </div>
-      <div class="knob seed">
-        <label for="seed">Seed</label>
-        <input type="number" id="seed" placeholder="random" min="0" step="1">
-        <div class="hint">set a number to make the take reproducible</div>
+  <div class="disclosures">
+    <details class="disclosure" id="disc-delivery">
+      <summary>
+        <span class="disc-chevron" aria-hidden="true"></span>
+        <span class="disc-title">Delivery</span>
+        <span class="disc-value numeric" id="delivery-summary"></span>
+      </summary>
+      <div class="disc-body">
+        <div class="knob">
+          <label for="exaggeration">Expression<output class="numeric" id="exaggeration-val">0.50</output></label>
+          <input type="range" id="exaggeration" min="0" max="1" step="0.05" value="0.5">
+          <p class="hint">How much emotion goes into the read. Low is flat, high is theatrical.</p>
+        </div>
+        <div class="knob">
+          <label for="cfg">Reference adherence<output class="numeric" id="cfg-val">0.50</output></label>
+          <input type="range" id="cfg" min="0" max="1" step="0.05" value="0.5">
+          <p class="hint">Higher sticks closer to the delivery in your reference recording.</p>
+        </div>
+        <div class="knob">
+          <label for="temperature">Variation<output class="numeric" id="temperature-val">0.80</output></label>
+          <input type="range" id="temperature" min="0.05" max="2" step="0.05" value="0.8">
+          <p class="hint">How much two takes of the same line differ from each other.</p>
+        </div>
+        <div class="knob">
+          <label for="rate">Speaking rate<output class="numeric" id="rate-val">1.00×</output></label>
+          <input type="range" id="rate" min="0.5" max="2" step="0.05" value="1">
+          <p class="hint">Pitch-preserving stretch. 1× leaves the pacing untouched.</p>
+        </div>
+        <div class="knob knob-inline">
+          <label for="seed">Seed</label>
+          <input type="number" id="seed" class="numeric" placeholder="random" min="0" step="1">
+          <p class="hint">Set a number to get the same take back every time.</p>
+        </div>
+        <div class="disc-foot">
+          <button type="button" class="link" id="reset-delivery">Reset to defaults</button>
+        </div>
       </div>
     </details>
 
-    <button type="button" class="primary" id="generate">Generate</button>
-    <div class="hint eta" id="eta"></div>
+    <details class="disclosure" id="disc-prosody">
+      <summary>
+        <span class="disc-chevron" aria-hidden="true"></span>
+        <span class="disc-title">Prosody marks</span>
+      </summary>
+      <div class="disc-body">
+        <dl class="marks">
+          <dt class="numeric">[pause:0.8]</dt><dd>Stitch a silence of that many seconds.</dd>
+          <dt class="numeric">[break]</dt><dd>A standard beat, same as a short pause.</dd>
+          <dt class="numeric">*word*</dt><dd>Lean on a word.</dd>
+          <dt class="numeric">[emph]…[/emph]</dt><dd>Lean on a whole phrase.</dd>
+        </dl>
+        <p class="hint">A blank line becomes a paragraph pause. Anything unrecognized is
+          ignored rather than spoken.</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="generate-row">
+    <button type="button" class="button-primary" id="generate">
+      <span>Generate</span>
+      <kbd aria-hidden="true">⌘↵</kbd>
+    </button>
+    <p class="eta" id="eta" aria-live="polite"></p>
+  </div>
+
+  <section class="stage" aria-labelledby="stage-heading">
+    <h2 id="stage-heading" class="sr-only">Output</h2>
+
+    <p class="stage-idle" id="idle-state">
+      The first take loads the model, which takes about ten seconds. After that it
+      synthesizes at roughly a fifth of realtime, a chunk at a time.
+    </p>
+
+    <div class="take" id="job-state" hidden>
+      <div class="take-head">
+        <span class="status" id="job-status" aria-live="polite">Queued</span>
+        <span class="numeric dim" id="job-timer"></span>
+      </div>
+      <div class="track" aria-hidden="true"><div class="track-fill" id="bar-fill"></div></div>
+      <ol class="chunks" id="chunk-list" aria-label="Chunk progress"></ol>
+      <p class="error" id="job-error" role="alert" hidden></p>
+    </div>
+
+    <div class="take" id="result" hidden>
+      <div class="take-head">
+        <span class="verdict" id="verdict-chip"></span>
+        <span class="meta" id="result-meta"></span>
+      </div>
+      <audio id="player" controls preload="metadata"></audio>
+      <div class="take-foot">
+        <a class="link" id="download" download>Save audio</a>
+      </div>
+    </div>
   </section>
 
-  <section class="panel output" aria-labelledby="output-h">
-    <h2 id="output-h">Output</h2>
-
-    <div id="idle-state" class="empty">
-      <p>Pick a voice, paste a script, hit <b>Generate</b>.</p>
-      <p class="hint">First generation loads the model (~10 s on Apple GPU); synthesis runs
-      at roughly one fifth of realtime, chunk by chunk — you'll see each one land below.</p>
-    </div>
-
-    <div id="job-state" hidden>
-      <div class="job-head">
-        <span id="job-status" class="status" aria-live="polite">queued</span>
-        <span id="job-timer" class="hint"></span>
-      </div>
-      <div class="bar" aria-hidden="true"><div id="bar-fill"></div></div>
-      <ol id="chunk-list" class="chunks" aria-label="chunk progress"></ol>
-      <div id="job-error" class="error" role="alert" hidden></div>
-    </div>
-
-    <div id="result" class="result" hidden>
-      <div class="result-head">
-        <span class="chip" id="verdict-chip"></span>
-        <span class="hint" id="result-meta"></span>
-      </div>
-      <audio id="player" controls></audio>
-      <div class="row-end">
-        <a id="download" class="ghost-link" download>download wav</a>
-      </div>
-    </div>
-
-    <h2 class="history-h">History</h2>
-    <div id="history" class="history" aria-live="polite"></div>
+  <section class="recent" aria-labelledby="recent-heading">
+    <h2 id="recent-heading" class="section-title">Recent</h2>
+    <div class="history" id="history" aria-live="polite"></div>
   </section>
+
 </main>
 
-<footer>
-  <span>local only · nothing leaves this machine (weights download once from Hugging Face)</span>
-  <span id="version"></span>
-</footer>
+<dialog class="sheet" id="settings" aria-labelledby="settings-heading">
+  <header class="sheet-head">
+    <h2 id="settings-heading">Settings</h2>
+    <button type="button" class="icon-button" id="settings-close" aria-label="Close settings">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/>
+      </svg>
+    </button>
+  </header>
 
-<script src="app.js"></script>
+  <div class="sheet-body">
+    <section class="sheet-section">
+      <h3>Voice</h3>
+      <div class="voice-card" id="voice-card"></div>
+      <div class="field voice-switch" id="voice-switch" hidden>
+        <label for="voice-select">Use this voice</label>
+        <select id="voice-select"></select>
+      </div>
+      <p class="hint" id="voice-hint"></p>
+    </section>
+
+    <section class="sheet-section">
+      <h3>Add or replace a voice</h3>
+      <form id="enroll-form">
+        <div class="field">
+          <label for="enroll-name">Name</label>
+          <input id="enroll-name" name="name" type="text" pattern="[a-z0-9_\-]{1,40}"
+                 placeholder="lowercase letters, digits, - _" required>
+        </div>
+        <div class="field">
+          <label for="enroll-files">Recordings</label>
+          <input id="enroll-files" name="files" type="file" multiple
+                 accept=".wav,.m4a,.mp3,.flac" required>
+          <p class="hint">Two or more clips let a held-out one verify the result.</p>
+        </div>
+        <label class="checkbox">
+          <input type="checkbox" id="enroll-overwrite">
+          <span>Replace the voice if that name already exists</span>
+        </label>
+        <div class="field-foot">
+          <p class="hint" id="enroll-status" role="status"></p>
+          <button type="submit" class="button-secondary" id="enroll-btn">Enroll</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="sheet-section">
+      <h3>Environment</h3>
+      <dl class="facts" id="env-facts"></dl>
+    </section>
+  </div>
+
+  <footer class="sheet-foot">
+    <span>Local only. Nothing leaves this machine — model weights download once.</span>
+    <span class="numeric dim" id="version"></span>
+  </footer>
+</dialog>
+
+<script type="module" src="app.js"></script>
 </body>
 </html>
