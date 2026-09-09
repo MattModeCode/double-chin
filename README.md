@@ -2,7 +2,7 @@
 
 Your voice, on script.
 
-Double Chin is a local voice-cloning application. Give it a few minutes of someone's voice and a text script, and it reads the script aloud in that voice — entirely on your machine. No cloud, no account, no audio leaving the laptop. One command opens the app: pick a voice, paste a script, hit Generate, and watch it synthesize chunk by chunk with a live speaker-similarity verdict on every take.
+Double Chin is a local voice-cloning application. Give it a few minutes of someone's voice and a text script, and it reads the script aloud in that voice — entirely on your machine. No cloud, no account, no audio leaving the laptop. One command opens a desktop window built around your own voice: write a script, hit Generate, and watch it synthesize chunk by chunk with a speaker-similarity check on every take.
 
 ![Double Chin Studio](demo/studio/double-chin-studio-demo.gif)
 
@@ -40,8 +40,17 @@ uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python -e ".[dev]"
 source .venv/bin/activate
 double-chin doctor          # checks device, deps, disk — everything should PASS
-double-chin studio          # starts http://127.0.0.1:8787 and opens your browser
+double-chin app             # opens the desktop window
 ```
+
+`double-chin app` is the desktop shell. `double-chin studio` serves the same
+interface at http://127.0.0.1:8787 in a browser, and `bash packaging/build_app.sh`
+builds `dist/Double Chin.app` so it launches from the Dock like any other app.
+
+The window is built around a single voice — the one you enrolled. Delivery
+controls, prosody marks and the environment report are there when you want them
+and out of the way when you don't; enrolling or switching voices lives in
+Settings.
 
 ## Clone your own voice
 

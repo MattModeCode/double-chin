@@ -1,0 +1,176 @@
+/* Double Chin — Apple design system.
+ *
+ * Values are AppKit/UIKit semantic colours, not invented ones. Two deliberate
+ * departures, both noted inline: the secondary label alpha is raised because
+ * Apple's own value fails WCAG AA for small text, and the accent has a defined
+ * pressed shade rather than a brightness filter.
+ *
+ * There is no decorative background anywhere in this file. Apple's materials
+ * blur the app's own content as it scrolls beneath them; a synthetic gradient
+ * behind the glass is the thing that makes translucency look fake.
+ */
+
+:root{
+  color-scheme: light dark;
+
+  /* ---------- type ----------
+   * SF via -apple-system. macOS body text is 13px, secondary 11px.
+   */
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    system-ui, sans-serif;
+  --font-num:
+    ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+
+  --text-caption: 10px;
+  --text-small:   11px;
+  --text-callout: 12px;
+  --text-body:    13px;
+  --text-title3:  15px;
+  --text-title2:  17px;
+
+  --weight-regular: 400;
+  --weight-medium:  500;
+  --weight-semibold: 600;
+
+  /* SF tightens optically as it grows; these match Apple's tracking table
+   * closely enough at the two sizes that carry headings. */
+  --tracking-body:  -0.006em;
+  --tracking-title: -0.014em;
+  --tracking-caps:   0.055em;
+
+  /* ---------- backgrounds ----------
+   * Apple's grouped-content system: a recessed page, opaque cards on top.
+   */
+  --bg-grouped:   #F2F2F7;
+  --bg-surface:   #FFFFFF;
+  --bg-inset:     #FFFFFF;
+
+  /* Fills, for tracks and unemphasized control backgrounds. */
+  --fill-secondary: rgba(120,120,128,.16);
+  --fill-tertiary:  rgba(120,120,128,.12);
+  --fill-quaternary:rgba(120,120,128,.08);
+
+  /* ---------- labels ---------- */
+  --label:          rgba(0,0,0,.92);
+  /* Apple's secondaryLabel is rgba(60,60,67,.60), which measures 3.5:1 on
+   * white and fails AA for text this size. Raised until it clears 4.5:1. */
+  --label-secondary: rgba(60,60,67,.74);
+  --label-tertiary:  rgba(60,60,67,.42);
+
+  --separator:       rgba(60,60,67,.29);
+  --separator-opaque:#D8D8DC;
+
+  /* ---------- accent and semantics ---------- */
+  --accent:         #007AFF;
+  --accent-pressed: #0062CC;
+  --accent-label:   #FFFFFF;
+
+  /* systemGreen/Orange/Red, darkened where they sit on white as text. */
+  --green: #248A3D;
+  --orange:#B25000;
+  --red:   #D70015;
+
+  /* ---------- materials ----------
+   * Only chrome uses these: the toolbar, which the page scrolls beneath, and
+   * the sheet, which sits over the page. Nothing else in the app is glass,
+   * because nothing else has anything behind it to show through.
+   */
+  --material-bar:   rgba(246,246,248,.72);
+  --material-sheet: rgba(246,246,248,.86);
+  --material-blur:  20px;
+  --material-sheet-blur: 30px;
+  --material-saturate: 180%;
+  --scrim: rgba(0,0,0,.22);
+
+  /* ---------- geometry ---------- */
+  --r-control: 8px;
+  --r-card:    12px;
+  --r-sheet:   12px;
+  --r-pill:    999px;
+
+  --gap-1: 4px;
+  --gap-2: 8px;
+  --gap-3: 12px;
+  --gap-4: 16px;
+  --gap-5: 20px;
+  --gap-6: 28px;
+
+  --shell-width: 680px;
+
+  /* Cards in a grouped layout carry no shadow — only things that genuinely
+   * float above the window do. */
+  --shadow-sheet: 0 12px 40px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.10);
+  --shadow-knob:  0 1px 3px rgba(0,0,0,.24), 0 0 0 .5px rgba(0,0,0,.08);
+
+  /* ---------- motion ----------
+   * Apple's default UI curve, and its short durations. Nothing drifts,
+   * pulses, or animates on its own.
+   */
+  --dur-fast: 120ms;
+  --dur:      200ms;
+  --ease:     cubic-bezier(.25, .1, .25, 1);
+  --ease-out: cubic-bezier(0, 0, .58, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-grouped: #1C1C1E;
+    --bg-surface: #2C2C2E;
+    --bg-inset:   #1C1C1E;
+
+    --fill-secondary: rgba(120,120,128,.36);
+    --fill-tertiary:  rgba(120,120,128,.24);
+    --fill-quaternary:rgba(120,120,128,.18);
+
+    --label:           rgba(255,255,255,.96);
+    --label-secondary: rgba(235,235,245,.64);
+    --label-tertiary:  rgba(235,235,245,.34);
+
+    --separator:        rgba(84,84,88,.72);
+    --separator-opaque: #38383A;
+
+    --accent:         #0A84FF;
+    --accent-pressed: #0060D0;
+
+    --green: #30D158;
+    --orange:#FF9F0A;
+    --red:   #FF453A;
+
+    --material-bar:   rgba(28,28,30,.72);
+    --material-sheet: rgba(38,38,40,.86);
+    --scrim: rgba(0,0,0,.44);
+
+    --shadow-sheet: 0 12px 40px rgba(0,0,0,.56), 0 2px 6px rgba(0,0,0,.36);
+    --shadow-knob:  0 1px 3px rgba(0,0,0,.44), 0 0 0 .5px rgba(0,0,0,.30);
+  }
+}
+
+/* Increased contrast: Apple drops translucency and firms up separators. */
+@media (prefers-contrast: more) {
+  :root{
+    --material-bar:   #F2F2F7;
+    --material-sheet: #FFFFFF;
+    --material-blur: 0px;
+    --material-sheet-blur: 0px;
+    --label:           rgba(0,0,0,1);
+    --label-secondary: rgba(0,0,0,.84);
+    --label-tertiary:  rgba(0,0,0,.62);
+    --separator:       rgba(0,0,0,.52);
+    --fill-secondary:  rgba(120,120,128,.34);
+    --accent:          #0040DD;
+  }
+}
+
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root{
+    --material-bar:   #1C1C1E;
+    --material-sheet: #2C2C2E;
+    --label:           rgba(255,255,255,1);
+    --label-secondary: rgba(255,255,255,.88);
+    --label-tertiary:  rgba(255,255,255,.66);
+    --separator:       rgba(255,255,255,.56);
+    --accent:          #4CA6FF;
+    --accent-label:    #001022;
+  }
+}

@@ -11,6 +11,7 @@ WebView pointed at 127.0.0.1 satisfies that.
 from __future__ import annotations
 
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -18,8 +19,41 @@ import time
 import uvicorn
 
 _PREFERRED_PORT = 8787
+# The window paints its background colour before the page has loaded. Left at
+# pywebview's white default that is a bright flash on the way into a dark
+# interface, so both values below mirror `--bg-grouped` in
+# studio/static/tokens.css — a test asserts they stay in step.
+_LAUNCH_COLOR_LIGHT = "#F2F2F7"
+_LAUNCH_COLOR_DARK = "#1C1C1E"
+_APPEARANCE_TIMEOUT_SECONDS = 2.0
 _STARTUP_TIMEOUT_SECONDS = 15.0
 _STARTUP_POLL_SECONDS = 0.05
+
+
+def _macos_prefers_dark() -> bool:
+    """True when macOS is in dark mode.
+
+    `defaults read -g AppleInterfaceStyle` prints "Dark" in dark mode and exits
+    non-zero in light mode (the key is absent), so any failure means light.
+    """
+    if sys.platform != "darwin":
+        return False
+    try:
+        result = subprocess.run(
+            ["defaults", "read", "-g", "AppleInterfaceStyle"],
+            capture_output=True,
+            text=True,
+            timeout=_APPEARANCE_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.stdout.strip() == "Dark"
+
+
+def _launch_background_color(prefers_dark=_macos_prefers_dark) -> str:
+    """The colour the window shows in the moment before the page paints."""
+    return _LAUNCH_COLOR_DARK if prefers_dark() else _LAUNCH_COLOR_LIGHT
 
 
 def _pick_port() -> int:
@@ -114,9 +148,10 @@ def run() -> int:
     window = webview.create_window(
         "Double Chin",
         f"http://127.0.0.1:{port}",
-        width=1160,
-        height=780,
-        min_size=(760, 560),
+        width=820,
+        height=860,
+        min_size=(520, 480),
+        background_color=_launch_background_color(),
     )
     window.events.closed += lambda: setattr(server, "should_exit", True)
 
