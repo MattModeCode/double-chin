@@ -62,6 +62,21 @@ double-chin train yourvoice path/to/recordings/ --manifest path/to/recordings/ma
 double-chin say "Hello, world." --voice yourvoice -o out.wav --verify
 ```
 
+Then tune how that voice is *delivered*:
+
+```bash
+double-chin tune yourvoice --real-dir path/to/recordings/ --write-defaults
+```
+
+`tune` searches the four delivery controls — expression, reference adherence,
+variation and speaking rate — synthesizing several takes per candidate and
+scoring each set against your own recordings with the indistinguishability
+gate. It prints the winning values and the run-to-run noise floor, so a tie
+never gets reported as a win, and `--write-defaults` saves the winner as the
+values the app opens with. In the window, **Match my voice** puts the sliders
+back on that profile; **Reset to neutral** returns to the engine's own
+baseline. Method and results: [docs/tuning.md](docs/tuning.md).
+
 Every enrolled voice lives only in `~/.double-chin/voices/`; deleting that folder revokes it entirely. Don't clone a voice you don't have the right to clone — every output carries an inaudible [Perth watermark](https://github.com/resemble-ai/chatterbox#watermarking), but it's a provenance signal, not a control.
 
 ## Licences

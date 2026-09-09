@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -53,3 +54,52 @@ def test_say_produces_audio_with_real_model(tmp_path, monkeypatch, capsys):
 
     score = float(match.group(1))
     assert score > 0.75
+
+
+@pytest.mark.skipif(
+    os.environ.get("DOUBLECHIN_E2E") != "1",
+    reason="set DOUBLECHIN_E2E=1 to run real-model end-to-end tests",
+)
+def test_tune_scores_candidates_and_writes_a_resumable_ledger(tmp_path, monkeypatch):
+    """A budget-capped sweep on the stand-in voice, end to end.
+
+    Deliberately tiny: the point is that the real engine, the real gate and
+    the ledger fit together, not that the winner is meaningful with this
+    little audio.
+    """
+    import json
+
+    from double_chin.cli import main
+    from double_chin.voices import enroll
+
+    monkeypatch.setenv("DOUBLECHIN_HOME", str(tmp_path / "home"))
+
+    real_dir = tmp_path / "real"
+    real_dir.mkdir()
+    for index in range(16):
+        shutil.copy(REFERENCE_WAV, real_dir / f"{index:03d}.wav")
+    enroll("standin", [real_dir / "000.wav", real_dir / "001.wav"])
+
+    work_dir = tmp_path / "work"
+    exit_code = main([
+        "tune", "standin",
+        "--real-dir", str(real_dir),
+        "--takes", "1",
+        "--budget", "2",
+        "--passes", "1",
+        "--work-dir", str(work_dir),
+        "--write-defaults",
+    ])
+    assert exit_code == 0
+
+    entries = [
+        json.loads(line)
+        for line in (work_dir / "ledger.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    assert entries, "the sweep recorded nothing"
+    assert all(0.0 <= entry["score"] <= 1.0 for entry in entries)
+
+    from double_chin.delivery import DeliveryProfile, load_defaults
+
+    assert isinstance(load_defaults(), DeliveryProfile)

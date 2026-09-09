@@ -257,3 +257,51 @@ Load-bearing decisions, each verifiable in `tests/test_studio.py`:
 **Gate integration:** Studio will eventually embed a gate-running UI; for now, `double-chin gate VOICE` runs the full suite from the CLI.
 
 Known limits, honestly: single-process, single-user by design; no job cancellation (kill the server); no ASR/content check on outputs (inherited from §8 — the upgrade path stands); SSE drops don't kill a job (state is polled/replayed from `/api/jobs/{id}`) but the UI tells you to check History rather than pretending nothing happened. Every claim in this section survived a dedicated second-round red team; its findings and the code fixes are in [red-team.md](red-team.md).
+
+## 11. Delivery tuning
+
+The engine exposes four delivery controls — `exaggeration` (Expression),
+`cfg_weight` (Reference adherence), `temperature` (Variation) and `rate`
+(Speaking rate). Until now their defaults were Chatterbox's own, which are
+not the values that best match any particular voice. `double-chin tune`
+searches them.
+
+Method, and the reasoning behind each choice:
+
+- **Score with the existing gate, not a new metric.** Each candidate is
+  synthesized several times and the resulting *set* of clips is scored against
+  a set of the owner's real recordings with `indistinguishability_gate`.
+- **Rank on the components that respond.** With eight real clips against three
+  clone clips, the gate's `discrimination` component sits at 0.0 for every
+  candidate — the classifier separates the sets outright, and a component that
+  is constant cannot order anything, it only makes the composite unreadable.
+  The search therefore ranks on speaker similarity, naturalness and prosody
+  combined with the gate's own weights, and records the full composite for
+  every candidate anyway. The objective is a parameter of the search
+  (`SweepContext.objective`), not a hardcoded assumption.
+- **Repeats, and a noise floor.** Generation is stochastic, so the baseline is
+  re-measured several times with different seeds before the search starts. A
+  winner that does not beat the baseline by more than that spread is reported
+  as a tie, not a win.
+- **Plain scripts.** The eval scripts carry no prosody markup: `*emphasis*`
+  adjusts exaggeration and cfg_weight per chunk and clamps at the knob's range,
+  which would distort exactly the candidates near the ends of the grid.
+- **A held-out check.** The winner is re-scored on a second script and a
+  disjoint set of real clips, which is what catches a profile fitted to one
+  passage.
+- **A resumable ledger.** Every measurement is appended to
+  `<home>/tuning/<voice>/ledger.jsonl`, keyed by profile, script and repeat, so
+  an interrupted run continues rather than restarting.
+
+The winner is stored as `delivery.TUNED_PROFILE`, which is what Studio opens
+with and what "Match my voice" restores; `GET /api/delivery` serves it (or the
+user's saved `~/.double-chin/delivery.json` over it) alongside the neutral
+baseline, so the numbers live in one place instead of being duplicated in the
+frontend.
+
+**Outcome on the owner's voice:** a tie for three of the four knobs — no
+setting of expression, adherence or variation beat the defaults on held-out
+text, so the tuned profile is the baseline. Speaking rate is the one clear
+result, and it is negative: any value other than 1.00x drops speaker
+similarity from ~0.66 to ~0.40, because the time-stretch is applied to
+finished audio. Run, results and honest limits: [tuning.md](tuning.md).

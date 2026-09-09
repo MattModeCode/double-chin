@@ -418,3 +418,93 @@ def test_jobs_pruned_to_cap(tmp_path, monkeypatch):
         _wait_done(client, job_id)
 
     assert len(manager._jobs) <= _MAX_RETAINED_JOBS
+
+
+def test_delivery_serves_the_opening_profile_and_the_neutral_baseline(studio):
+    client, _engine, _ = studio
+    from double_chin.delivery import NEUTRAL_PROFILE, TUNED_PROFILE
+
+    payload = client.get("/api/delivery").json()
+
+    assert payload["defaults"] == TUNED_PROFILE.as_dict()  # no saved file yet
+    assert payload["neutral"] == NEUTRAL_PROFILE.as_dict()
+    assert set(payload["defaults"]) == {"exaggeration", "cfg_weight", "temperature", "rate"}
+
+
+def test_delivery_defaults_reflect_a_saved_profile(studio):
+    client, _engine, _ = studio
+    from double_chin.delivery import TUNED_PROFILE, DeliveryProfile, save_defaults
+
+    saved = DeliveryProfile(0.3, 0.75, 0.6, 0.95)
+    save_defaults(saved)
+
+    payload = client.get("/api/delivery").json()
+    assert payload["defaults"] == saved.as_dict()
+    assert payload["defaults"] != TUNED_PROFILE.as_dict()
+    assert payload["neutral"] != saved.as_dict()  # reset still goes somewhere else
+
+
+def test_delivery_defaults_survive_a_corrupt_file(studio):
+    client, _engine, _ = studio
+    from double_chin.delivery import TUNED_PROFILE, defaults_path
+
+    defaults_path().parent.mkdir(parents=True, exist_ok=True)
+    defaults_path().write_text("}{")
+
+    payload = client.get("/api/delivery").json()
+    assert payload["defaults"] == TUNED_PROFILE.as_dict()
+
+
+def test_delivery_values_are_accepted_by_the_jobs_endpoint(studio, tmp_path):
+    client, engine, _ = studio
+    _enroll_test_voice(tmp_path)
+
+    payload = client.get("/api/delivery").json()
+    for name in ("defaults", "neutral"):
+        response = client.post(
+            "/api/jobs", json={"voice": "testvoice", "text": "A line.", **payload[name]}
+        )
+        assert response.status_code == 202, f"{name} rejected: {response.text}"
+        _wait_done(client, response.json()["job_id"])
+
+    assert engine.calls[0]["params"]["cfg_weight"] == payload["defaults"]["cfg_weight"]
+
+
+def test_every_element_id_the_frontend_touches_exists_in_the_page():
+    """`$("some-id")` in app.js must name a real element in index.html.
+
+    The studio frontend has no test runner of its own, so a renamed or
+    forgotten id would otherwise only surface as a dead button in the browser.
+    """
+    import re
+
+    static = Path(__file__).resolve().parents[1] / "src" / "double_chin" / "studio" / "static"
+    script = (static / "app.js").read_text()
+    markup = (static / "index.html").read_text()
+
+    referenced = set(re.findall(r'\$\("([a-z0-9-]+)"\)', script))
+    # Some elements are built by app.js itself (the empty-state link), so ids
+    # it assigns count as declared too.
+    declared = set(re.findall(r'id="([a-z0-9-]+)"', markup))
+    declared |= set(re.findall(r'id:\s*"([a-z0-9-]+)"', script))
+
+    missing = sorted(referenced - declared)
+    assert not missing, f"app.js references ids that index.html does not define: {missing}"
+
+
+def test_delivery_knob_ids_have_a_numeric_readout_each():
+    """Every slider id also needs its `<id>-val` output, which syncDelivery writes."""
+    import re
+
+    static = Path(__file__).resolve().parents[1] / "src" / "double_chin" / "studio" / "static"
+    script = (static / "app.js").read_text()
+    markup = (static / "index.html").read_text()
+
+    block = re.search(r"const KNOB_FIELDS = Object\.freeze\(\{(.+?)\}\)", script, re.S)
+    knob_ids = re.findall(r"^\s*([a-z_]+):", block.group(1), re.M)
+    assert knob_ids, "KNOB_FIELDS is empty; the delivery panel would never sync"
+
+    declared = set(re.findall(r'id="([a-z0-9-]+)"', markup))
+    for knob_id in knob_ids:
+        assert knob_id in declared, f"no slider with id {knob_id}"
+        assert f"{knob_id}-val" in declared, f"no readout with id {knob_id}-val"

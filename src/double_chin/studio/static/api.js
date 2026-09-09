@@ -26,6 +26,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }),
+  delivery: () => request("/api/delivery"),
   listHistory: () => request("/api/history"),
   doctor: () => request("/api/doctor"),
   jobEvents: (jobId) => new EventSource(`/api/jobs/${jobId}/events`),
